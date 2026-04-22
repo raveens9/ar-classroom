@@ -1,0 +1,15 @@
+node_modules
+dist
+.next
+*.log
+.env
+.env.local
+.env.*.local
+certs/
+!certs/.gitkeep
+apps/ml-api/.venv
+apps/ml-api/__pycache__
+apps/ml-api/**/__pycache__
+.DS_Store
+coverage
+.turbo

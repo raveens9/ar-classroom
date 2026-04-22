@@ -1,0 +1,31 @@
+{
+  "name": "ar-platform",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Teacher-student collaborative drawing + AR platform",
+  "workspaces": [
+    "packages/*",
+    "apps/web",
+    "apps/realtime"
+  ],
+  "scripts": {
+    "cert:generate": "node scripts/generate-certs.mjs",
+    "lan:ip": "node scripts/get-lan-ip.mjs",
+    "build:shared": "npm run build -w @ar/shared",
+    "dev:shared": "npm run dev -w @ar/shared",
+    "dev:web": "npm run dev -w @ar/web",
+    "dev:realtime": "npm run dev -w @ar/realtime",
+    "dev:ml": "cd apps/ml-api && python -m uvicorn main:app --host 0.0.0.0 --port 8000 --reload --ssl-keyfile ../../certs/dev-key.pem --ssl-certfile ../../certs/dev-cert.pem",
+    "dev": "npm run build:shared && concurrently -n web,realtime -c cyan,magenta \"npm run dev:web\" \"npm run dev:realtime\"",
+    "dev:full": "npm run build:shared && concurrently -n web,realtime,ml -c cyan,magenta,yellow \"npm run dev:web\" \"npm run dev:realtime\" \"npm run dev:ml\"",
+    "build": "npm run build -ws --if-present",
+    "typecheck": "npm run build:shared && npm run typecheck -ws --if-present"
+  },
+  "devDependencies": {
+    "concurrently": "^9.0.1",
+    "typescript": "^5.6.3"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}
