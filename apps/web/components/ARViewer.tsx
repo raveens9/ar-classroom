@@ -19,7 +19,16 @@ export function ARViewer({ manifests }: Props) {
   const [session, setSession] = useState<XRSession | null>(null);
   const [mode, setMode] = useState<"xr" | "fallback" | "none">("none");
   const [cameraReady, setCameraReady] = useState(false);
+  const [isIOS, setIsIOS] = useState(false);
+  const [isConverting, setIsConverting] = useState(false);
   const canvasRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    setIsIOS(
+      /iPad|iPhone|iPod/.test(navigator.userAgent) &&
+        !(window as unknown as { MSStream?: unknown }).MSStream
+    );
+  }, []);
 
   // Feature-detect WebXR AR support.
   useEffect(() => {
@@ -64,6 +73,78 @@ export function ARViewer({ manifests }: Props) {
     setMode("fallback");
   };
 
+  // Converts all manifests' GLB models to a single USDZ and triggers
+  // Safari AR Quick Look — giving real ARKit world-anchored placement on iOS.
+  const openARQuickLook = async () => {
+    setIsConverting(true);
+    try {
+      const [{ GLTFLoader }, { USDZExporter }] = await Promise.all([
+        import("three/examples/jsm/loaders/GLTFLoader.js"),
+        import("three/examples/jsm/exporters/USDZExporter.js"),
+      ]);
+
+      const loader = new GLTFLoader();
+      const TARGET_SIZE = 0.6; // metres, matches ARModel default
+      const n = manifests.length;
+
+      // Load all GLBs in parallel.
+      const scenes = await Promise.all(
+        manifests.map(
+          (m) =>
+            new Promise<THREE.Group>((resolve, reject) => {
+              loader.load(m.modelUrl, (gltf) => resolve(gltf.scene as THREE.Group), undefined, reject);
+            })
+        )
+      );
+
+      const root = new THREE.Group();
+
+      scenes.forEach((scene, i) => {
+        // Arc layout — mirrors the <Scene> component below.
+        const t = n === 1 ? 0 : (i / (n - 1)) * 2 - 1;
+        const angle = t * 0.8;
+        const r = 1.4;
+        const x = n === 1 ? 0 : Math.sin(angle) * r;
+        const z = n === 1 ? 0 : -Math.cos(angle) * r;
+
+        // Auto-fit scale — mirrors ARModel logic.
+        const box = new THREE.Box3().setFromObject(scene);
+        const size = new THREE.Vector3();
+        box.getSize(size);
+        const largest = Math.max(size.x, size.y, size.z);
+        const s = isFinite(largest) && largest > 0 ? TARGET_SIZE / largest : 1;
+        const yOff = -box.min.y * s;
+
+        scene.scale.setScalar(s);
+        scene.position.set(x, yOff, z);
+        root.add(scene);
+      });
+
+      const exporter = new USDZExporter();
+      const bytes = await exporter.parseAsync(root);
+
+      const blob = new Blob([bytes.buffer as ArrayBuffer], { type: "model/vnd.usdz+zip" });
+      const url = URL.createObjectURL(blob);
+
+      // Safari triggers AR Quick Look when an <a rel="ar"> with a child element is clicked.
+      const a = document.createElement("a");
+      a.rel = "ar";
+      a.href = url;
+      a.appendChild(document.createElement("img"));
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+
+      setTimeout(() => URL.revokeObjectURL(url), 10_000);
+    } catch (e) {
+      console.error("[ar] USDZ conversion failed", e);
+      // Fall back to the camera overlay if conversion fails.
+      startFallback();
+    } finally {
+      setIsConverting(false);
+    }
+  };
+
   return (
     <div ref={canvasRef} className="fixed inset-0 bg-black">
       {mode === "none" && (
@@ -73,15 +154,40 @@ export function ARViewer({ manifests }: Props) {
             <p className="text-sm text-white/70">
               {manifests.length} model{manifests.length === 1 ? "" : "s"} in this room.
             </p>
-            {xrSupport === "supported" && (
+
+            {/* iOS: AR Quick Look gives real ARKit world placement */}
+            {isIOS && (
+              <>
+                <button
+                  className="btn-primary w-full"
+                  onClick={openARQuickLook}
+                  disabled={isConverting}
+                >
+                  {isConverting ? "Preparing AR…" : "View in AR"}
+                </button>
+                <p className="text-xs text-white/50">
+                  Points your camera at a flat surface, then tap to place the model in your room.
+                </p>
+              </>
+            )}
+
+            {/* Android / desktop: immersive WebXR */}
+            {!isIOS && xrSupport === "supported" && (
               <button className="btn-primary w-full" onClick={startXR}>
                 Start immersive AR
               </button>
             )}
+
+            {/* Camera overlay fallback — available on all devices */}
             <button className="btn-ghost w-full" onClick={startFallback}>
-              {xrSupport === "supported" ? "Use camera fallback" : "Start camera view"}
+              {isIOS
+                ? "Preview in 3D"
+                : xrSupport === "supported"
+                ? "Use camera fallback"
+                : "Start camera view"}
             </button>
-            {xrSupport === "unsupported" && (
+
+            {!isIOS && xrSupport === "unsupported" && (
               <p className="text-xs text-white/50">
                 WebXR AR is not available on this device. The camera fallback uses getUserMedia.
               </p>
