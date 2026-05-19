@@ -1,9 +1,11 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import Link from "next/link";
 import { CollabCanvas, type CanvasHandle } from "@/components/Canvas";
 import { emitAck, getSocket } from "@/lib/socket";
-import { teacherId as getTeacherId } from "@/lib/studentId";
+import { createClient } from "@/lib/supabase";
 import {
   mlApproveGenerateAR,
   mlClassify,
@@ -12,7 +14,20 @@ import {
 } from "@/lib/mlApi";
 import type { Room, RoomMode } from "@ar/shared";
 
+function dataUrlToBlob(dataUrl: string): Blob {
+  const [header, data] = dataUrl.split(",");
+  const mime = header.match(/:(.*?);/)?.[1] ?? "image/png";
+  const bytes = atob(data);
+  const arr = new Uint8Array(bytes.length);
+  for (let i = 0; i < bytes.length; i++) arr[i] = bytes.charCodeAt(i);
+  return new Blob([arr], { type: mime });
+}
+
 export default function TeacherPage() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const sessionId = searchParams.get("sessionId");
+
   const [teacherId, setTeacherId] = useState<string>("");
   const [room, setRoom] = useState<Room | null>(null);
   const [mode, setMode] = useState<RoomMode>("OPEN");
@@ -24,7 +39,6 @@ export default function TeacherPage() {
   const [busy, setBusy] = useState(false);
   const canvasRef = useRef<CanvasHandle>(null);
 
-  // prep bundle the ML pipeline builds up
   const [prep, setPrep] = useState<{
     cutoutUrl?: string;
     label?: string;
@@ -34,7 +48,10 @@ export default function TeacherPage() {
   }>({});
 
   useEffect(() => {
-    setTeacherId(getTeacherId());
+    const supabase = createClient();
+    supabase.auth.getUser().then(({ data }) => {
+      if (data.user) setTeacherId(data.user.id);
+    });
   }, []);
 
   useEffect(() => {
@@ -54,6 +71,11 @@ export default function TeacherPage() {
       const r = await emitAck("room:create", { teacherId, mode });
       setRoom(r);
       appendLog(`Created room ${r.roomId} (${r.mode})`);
+
+      if (sessionId) {
+        const supabase = createClient();
+        await supabase.from("sessions").update({ socket_room_id: r.roomId }).eq("id", sessionId);
+      }
     } catch (e) {
       appendLog(`ERR: ${(e as Error).message}`);
     }
@@ -92,8 +114,6 @@ export default function TeacherPage() {
     }
   };
 
-  // Switching watched student: Canvas remounts via key={watchedStudentId} and
-  // calls room:watch automatically, so no socket call needed here.
   const watch = (studentId: string) => {
     setWatchedStudentId(studentId);
     appendLog(`Watching ${studentId}`);
@@ -102,7 +122,11 @@ export default function TeacherPage() {
   const appendLog = (line: string) =>
     setLog((l) => [`[${new Date().toLocaleTimeString()}] ${line}`, ...l].slice(0, 50));
 
-  // ─── ML pipeline ─────────────────────────────────────────────
+  const signOut = async () => {
+    await createClient().auth.signOut();
+    router.push("/login");
+  };
+
   const exportCanvas = (): string | null => {
     const fn = (window as unknown as { __canvasExport?: () => string }).__canvasExport;
     return fn ? fn() : null;
@@ -149,11 +173,33 @@ export default function TeacherPage() {
         animationName: prep.suggestedAnimation,
         label: prep.label,
       });
-      await emitAck("ar:publish", {
-        roomId: room.roomId,
-        manifest: r.manifest,
-      });
+      await emitAck("ar:publish", { roomId: room.roomId, manifest: r.manifest });
       appendLog(`Published AR for ${watchedStudentId}`);
+
+      // Persist drawing to Supabase
+      if (sessionId) {
+        try {
+          const supabase = createClient();
+          const dataUrl = exportCanvas();
+          if (dataUrl) {
+            const blob = dataUrlToBlob(dataUrl);
+            const path = `${sessionId}/${watchedStudentId}-${Date.now()}.png`;
+            await supabase.storage.from("drawings").upload(path, blob, { contentType: "image/png" });
+            const { data: { publicUrl } } = supabase.storage.from("drawings").getPublicUrl(path);
+            await supabase.from("drawings").insert({
+              session_id: sessionId,
+              student_id: watchedStudentId,
+              canvas_png_url: publicUrl,
+              cutout_url: prep.cutoutUrl,
+              ar_manifest: r.manifest,
+            });
+            appendLog("Drawing saved");
+          }
+        } catch (e) {
+          appendLog(`ERR save: ${(e as Error).message}`);
+        }
+      }
+
       setPrep({});
     } catch (e) {
       appendLog(`ERR publish: ${(e as Error).message}`);
@@ -175,8 +221,17 @@ export default function TeacherPage() {
     <main className="min-h-screen p-4 md:p-8 grid gap-4 lg:grid-cols-[320px_1fr]">
       <aside className="space-y-4">
         <div className="card">
+          <div className="flex items-center justify-between mb-2">
+            <Link href="/dashboard" className="text-xs text-white/40 hover:text-white/70 transition-colors">
+              ← Dashboard
+            </Link>
+            <button onClick={signOut} className="text-xs text-white/40 hover:text-white/70 transition-colors">
+              Sign out
+            </button>
+          </div>
           <h1 className="text-lg font-semibold">Teacher</h1>
           <p className="text-xs text-white/50 break-all">id: {teacherId}</p>
+          {sessionId && <p className="text-xs text-white/30">session: {sessionId}</p>}
           {!room ? (
             <div className="mt-3 flex gap-2">
               <select
@@ -241,9 +296,7 @@ export default function TeacherPage() {
               <ul className="space-y-2">
                 {admitted.map((s) => (
                   <li key={s.studentId} className="flex items-center justify-between text-sm">
-                    <span
-                      className={watchedStudentId === s.studentId ? "text-brand font-medium" : ""}
-                    >
+                    <span className={watchedStudentId === s.studentId ? "text-brand font-medium" : ""}>
                       {s.displayName}
                     </span>
                     <div className="flex gap-2">
@@ -317,26 +370,16 @@ export default function TeacherPage() {
               />
             </label>
             <div className="flex gap-1">
-              <button
-                className={tool === "pen" ? "btn-primary" : "btn-ghost"}
-                onClick={() => setTool("pen")}
-              >
+              <button className={tool === "pen" ? "btn-primary" : "btn-ghost"} onClick={() => setTool("pen")}>
                 Pen
               </button>
-              <button
-                className={tool === "eraser" ? "btn-primary" : "btn-ghost"}
-                onClick={() => setTool("eraser")}
-              >
+              <button className={tool === "eraser" ? "btn-primary" : "btn-ghost"} onClick={() => setTool("eraser")}>
                 Eraser
               </button>
             </div>
             <div className="flex gap-1">
-              <button className="btn-ghost" onClick={() => canvasRef.current?.undo()}>
-                Undo
-              </button>
-              <button className="btn-ghost" onClick={() => canvasRef.current?.redo()}>
-                Redo
-              </button>
+              <button className="btn-ghost" onClick={() => canvasRef.current?.undo()}>Undo</button>
+              <button className="btn-ghost" onClick={() => canvasRef.current?.redo()}>Redo</button>
             </div>
           </div>
         </div>
