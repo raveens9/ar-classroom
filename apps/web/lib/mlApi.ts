@@ -47,6 +47,7 @@ export interface ApproveResponse {
   manifest: {
     manifestId: string;
     authorId: string;
+    authorName?: string | null;
     modelUrl: string;
     textureUrl?: string | null;
     animationName?: string | null;
@@ -85,6 +86,7 @@ export async function mlApproveGenerateAR(args: {
   roomId: string;
   studentId: string;
   authorId: string;
+  authorName?: string;
   modelUrl: string;
   textureUrl?: string;
   animationName?: string;
@@ -100,6 +102,7 @@ export async function mlApproveGenerateAR(args: {
     manifest: {
       manifestId: m.manifestId,
       authorId: m.authorId,
+      authorName: m.authorName ?? args.authorName ?? undefined,
       modelUrl: rewriteHost(m.modelUrl),
       textureUrl: m.textureUrl ? rewriteHost(m.textureUrl) : undefined,
       animationName: m.animationName ?? undefined,

@@ -47,6 +47,30 @@ export default function TeacherPage() {
     textureUrl?: string;
   }>({});
 
+  // Auto-recreate the room as soon as we have both the teacher ID and a session.
+  // This is idempotent — the server returns the existing room if it's still alive,
+  // or creates a fresh one (and we update the DB) if the server restarted.
+  const hasAutoCreated = useRef(false);
+  useEffect(() => {
+    if (!teacherId || !sessionId || hasAutoCreated.current) return;
+    hasAutoCreated.current = true;
+    let cancelled = false;
+
+    emitAck("room:create", { teacherId, mode: "OPEN" })
+      .then(async (r) => {
+        if (cancelled) return;
+        setRoom(r);
+        appendLog(`Room ready: ${r.roomId}`);
+        const supabase = createClient();
+        await supabase.from("sessions").update({ socket_room_id: r.roomId }).eq("id", sessionId);
+      })
+      .catch((e) => {
+        if (!cancelled) appendLog(`ERR auto-create: ${(e as Error).message}`);
+      });
+
+    return () => { cancelled = true; };
+  }, [teacherId, sessionId]);
+
   useEffect(() => {
     const supabase = createClient();
     supabase.auth.getUser().then(({ data }) => {
@@ -164,10 +188,12 @@ export default function TeacherPage() {
     if (!room || !watchedStudentId || !prep.modelUrl) return;
     setBusy(true);
     try {
+      const student = room.students.find((s) => s.studentId === watchedStudentId);
       const r = await mlApproveGenerateAR({
         roomId: room.roomId,
         studentId: watchedStudentId,
         authorId: watchedStudentId,
+        authorName: student?.displayName,
         modelUrl: prep.modelUrl,
         textureUrl: prep.textureUrl,
         animationName: prep.suggestedAnimation,
@@ -336,6 +362,21 @@ export default function TeacherPage() {
                 )}
               </div>
             )}
+
+            <div className="card space-y-2">
+              <h2 className="font-medium text-sm">Classroom AR</h2>
+              <a
+                href="/arjs/hiro.png"
+                target="_blank"
+                rel="noreferrer"
+                className="btn-ghost w-full text-xs"
+              >
+                Print Hiro marker →
+              </a>
+              <p className="text-xs text-white/40">
+                Students point their camera at this marker to see all models anchored together.
+              </p>
+            </div>
 
             <div className="card">
               <h2 className="font-medium mb-2">Log</h2>

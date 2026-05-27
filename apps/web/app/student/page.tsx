@@ -49,7 +49,23 @@ export default function StudentPage() {
       setRoom(r);
       setWaitingForRoom(false);
     } catch (e) {
-      setError((e as Error).message);
+      const msg = (e as Error).message;
+      if (msg === "Room not found") {
+        // The cached roomId is stale (server restarted). Clear it and fall into
+        // the polling loop — it will pick up the new roomId once the teacher's
+        // page has auto-recreated the room and updated the database.
+        setRoomId("");
+        setWaitingForRoom(true);
+        try {
+          const raw = localStorage.getItem(SESSION_KEY);
+          if (raw) {
+            const stored = JSON.parse(raw);
+            localStorage.setItem(SESSION_KEY, JSON.stringify({ ...stored, socketRoomId: null }));
+          }
+        } catch {}
+      } else {
+        setError(msg);
+      }
     }
   };
 
