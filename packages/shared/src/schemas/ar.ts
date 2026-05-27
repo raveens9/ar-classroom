@@ -3,6 +3,7 @@ import { z } from "zod";
 export const ARManifestSchema = z.object({
   manifestId: z.string().min(1),
   authorId: z.string().min(1),
+  authorName: z.string().optional(),
   modelUrl: z.string().url(),
   textureUrl: z.string().url().optional(),
   animationName: z.string().optional(),

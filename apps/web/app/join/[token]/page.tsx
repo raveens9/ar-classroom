@@ -1,5 +1,6 @@
 export const dynamic = "force-dynamic";
 
+import { unstable_noStore as noStore } from "next/cache";
 import { notFound } from "next/navigation";
 import { createServiceClient } from "@/lib/supabase-server";
 import { RosterPicker } from "./RosterPicker";
@@ -9,6 +10,7 @@ interface Props {
 }
 
 export default async function JoinPage({ params }: Props) {
+  noStore();
   const { token } = await params;
   const supabase = createServiceClient();
 

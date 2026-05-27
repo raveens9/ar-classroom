@@ -47,6 +47,27 @@ export default function TeacherPage() {
     textureUrl?: string;
   }>({});
 
+  const hasAutoCreated = useRef(false);
+  useEffect(() => {
+    if (!teacherId || !sessionId || hasAutoCreated.current) return;
+    hasAutoCreated.current = true;
+    let cancelled = false;
+
+    emitAck("room:create", { teacherId, mode: "OPEN" })
+      .then(async (r) => {
+        if (cancelled) return;
+        setRoom(r);
+        appendLog(`Room ready: ${r.roomId}`);
+        const supabase = createClient();
+        await supabase.from("sessions").update({ socket_room_id: r.roomId }).eq("id", sessionId);
+      })
+      .catch((e) => {
+        if (!cancelled) appendLog(`ERR auto-create: ${(e as Error).message}`);
+      });
+
+    return () => { cancelled = true; };
+  }, [teacherId, sessionId]);
+
   useEffect(() => {
     const supabase = createClient();
     supabase.auth.getUser().then(({ data }) => {
@@ -78,6 +99,23 @@ export default function TeacherPage() {
       }
     } catch (e) {
       appendLog(`ERR: ${(e as Error).message}`);
+    }
+  };
+
+  const endSession = async () => {
+    if (!room || !sessionId) return;
+    if (!confirm("End the session? Students will be disconnected and the session will close.")) return;
+    setBusy(true);
+    try {
+      await emitAck("room:close", { roomId: room.roomId });
+      const supabase = createClient();
+      await supabase.from("sessions").update({ ended_at: new Date().toISOString() }).eq("id", sessionId);
+      appendLog("Session ended");
+      router.push("/dashboard");
+    } catch (e) {
+      appendLog(`ERR end: ${(e as Error).message}`);
+    } finally {
+      setBusy(false);
     }
   };
 
@@ -164,10 +202,12 @@ export default function TeacherPage() {
     if (!room || !watchedStudentId || !prep.modelUrl) return;
     setBusy(true);
     try {
+      const authorName = room.students.find((s) => s.studentId === watchedStudentId)?.displayName;
       const r = await mlApproveGenerateAR({
         roomId: room.roomId,
         studentId: watchedStudentId,
         authorId: watchedStudentId,
+        authorName,
         modelUrl: prep.modelUrl,
         textureUrl: prep.textureUrl,
         animationName: prep.suggestedAnimation,
@@ -265,6 +305,15 @@ export default function TeacherPage() {
                   CLOSED
                 </button>
               </div>
+              {sessionId && (
+                <button
+                  className="btn-danger w-full mt-1"
+                  onClick={endSession}
+                  disabled={busy}
+                >
+                  End session
+                </button>
+              )}
             </div>
           )}
         </div>

@@ -49,7 +49,20 @@ export default function StudentPage() {
       setRoom(r);
       setWaitingForRoom(false);
     } catch (e) {
-      setError((e as Error).message);
+      const msg = (e as Error).message;
+      if (msg === "Room not found") {
+        setRoomId("");
+        setWaitingForRoom(true);
+        try {
+          const raw = localStorage.getItem(SESSION_KEY);
+          if (raw) {
+            const stored = JSON.parse(raw);
+            localStorage.setItem(SESSION_KEY, JSON.stringify({ ...stored, socketRoomId: null }));
+          }
+        } catch {}
+      } else {
+        setError(msg);
+      }
     }
   };
 

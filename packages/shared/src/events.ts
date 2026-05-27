@@ -11,6 +11,7 @@ import type {
   AdmitStudentPayload,
   RemoveStudentPayload,
   WatchStudentPayload,
+  CloseRoomPayload,
 } from "./schemas/room.js";
 import type {
   ARManifest,
@@ -26,6 +27,7 @@ export interface ClientToServerEvents {
   "room:join": (p: JoinRoomPayload, ack: (r: Ack<Room>) => void) => void;
   "room:admit": (p: AdmitStudentPayload, ack: (r: Ack<Room>) => void) => void;
   "room:remove": (p: RemoveStudentPayload, ack: (r: Ack<Room>) => void) => void;
+  "room:close": (p: CloseRoomPayload, ack: (r: Ack<{ closed: true }>) => void) => void;
   "room:watch": (p: WatchStudentPayload, ack: (r: Ack<CanvasSync>) => void) => void;
   "canvas:stroke": (p: StrokeEvent, ack: (r: Ack<{ received: true }>) => void) => void;
   "canvas:clear": (p: CanvasClear, ack: (r: Ack<{ cleared: true }>) => void) => void;

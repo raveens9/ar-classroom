@@ -28,6 +28,7 @@ export default function ClassroomPage() {
   const [adding, setAdding] = useState(false);
   const [tab, setTab] = useState<Tab>("roster");
   const [activeSession, setActiveSession] = useState<{ id: string; socket_room_id: string | null } | null | undefined>(undefined);
+  const [endingSession, setEndingSession] = useState(false);
   const [startingSession, setStartingSession] = useState(false);
   const [joinUrl, setJoinUrl] = useState("");
 
@@ -87,6 +88,15 @@ export default function ClassroomPage() {
       router.push(`/teacher?sessionId=${data.id}`);
     }
     setStartingSession(false);
+  }
+
+  async function endSession() {
+    if (!activeSession) return;
+    if (!confirm("End this session? Students will be disconnected and the session will close.")) return;
+    setEndingSession(true);
+    await supabase.from("sessions").update({ ended_at: new Date().toISOString() }).eq("id", activeSession.id);
+    setActiveSession(null);
+    setEndingSession(false);
   }
 
   async function removeStudent(id: string) {
@@ -198,6 +208,13 @@ export default function ClassroomPage() {
                 onClick={() => router.push(`/teacher?sessionId=${activeSession.id}`)}
               >
                 Open Teacher View →
+              </button>
+              <button
+                className="btn-danger w-full"
+                onClick={endSession}
+                disabled={endingSession}
+              >
+                {endingSession ? "Ending…" : "End session"}
               </button>
             </div>
           ) : (

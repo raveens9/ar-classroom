@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Canvas } from "@react-three/fiber";
-import { Environment, OrbitControls } from "@react-three/drei";
+import { Canvas, useFrame } from "@react-three/fiber";
+import { Environment, OrbitControls, Html } from "@react-three/drei";
 import * as THREE from "three";
 import type { ARManifest } from "@ar/shared";
 import { ARModel } from "./ARModel";
@@ -14,14 +14,26 @@ interface Props {
 
 type XrSupport = "checking" | "supported" | "unsupported";
 
+// Module-level scratch to avoid per-frame GC pressure
+const _euler = new THREE.Euler();
+const _screenQ = new THREE.Quaternion(-Math.SQRT1_2, 0, 0, Math.SQRT1_2);
+const _qInitInv = new THREE.Quaternion();
+const _qDelta = new THREE.Quaternion();
+
 export function ARViewer({ manifests }: Props) {
   const [xrSupport, setXrSupport] = useState<XrSupport>("checking");
   const [session, setSession] = useState<XRSession | null>(null);
   const [mode, setMode] = useState<"xr" | "fallback" | "none">("none");
   const [cameraReady, setCameraReady] = useState(false);
+  const [anchored, setAnchored] = useState(false);
   const canvasRef = useRef<HTMLDivElement | null>(null);
 
-  // Feature-detect WebXR AR support.
+  // Updated every deviceorientation event; read inside Canvas via useFrame
+  const currentOrientationQ = useRef(new THREE.Quaternion());
+  // Set once when the user taps "Anchor here"; null means floating (pre-anchor)
+  const initialOrientationQ = useRef<THREE.Quaternion | null>(null);
+
+  // Feature-detect WebXR AR support
   useEffect(() => {
     let cancelled = false;
     const xr = (navigator as Navigator & { xr?: XRSystem }).xr;
@@ -33,10 +45,28 @@ export function ARViewer({ manifests }: Props) {
       (ok) => !cancelled && setXrSupport(ok ? "supported" : "unsupported"),
       () => !cancelled && setXrSupport("unsupported")
     );
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, []);
+
+  // Track device orientation while in fallback mode
+  useEffect(() => {
+    if (mode !== "fallback") return;
+
+    const onOrientation = (e: DeviceOrientationEvent) => {
+      if (e.alpha === null || e.beta === null || e.gamma === null) return;
+      _euler.set(
+        THREE.MathUtils.degToRad(e.beta ?? 0),
+        THREE.MathUtils.degToRad(e.alpha ?? 0),
+        THREE.MathUtils.degToRad(-(e.gamma ?? 0)),
+        "YXZ"
+      );
+      currentOrientationQ.current.setFromEuler(_euler);
+      currentOrientationQ.current.multiply(_screenQ);
+    };
+
+    window.addEventListener("deviceorientation", onOrientation);
+    return () => window.removeEventListener("deviceorientation", onOrientation);
+  }, [mode]);
 
   const startXR = async () => {
     const xr = (navigator as Navigator & { xr?: XRSystem }).xr;
@@ -49,19 +79,33 @@ export function ARViewer({ manifests }: Props) {
       } as XRSessionInit);
       setSession(s);
       setMode("xr");
-      s.addEventListener("end", () => {
-        setSession(null);
-        setMode("none");
-      });
+      s.addEventListener("end", () => { setSession(null); setMode("none"); });
     } catch (e) {
       console.error("[ar] XR request failed", e);
       setMode("fallback");
     }
   };
 
-  const startFallback = () => {
+  const startFallback = async () => {
+    // iOS 13+ requires DeviceOrientation permission from a user-gesture context
+    const doa = DeviceOrientationEvent as unknown as { requestPermission?: () => Promise<string> };
+    if (typeof doa.requestPermission === "function") {
+      try { await doa.requestPermission(); } catch {}
+    }
     setCameraReady(false);
+    setAnchored(false);
+    initialOrientationQ.current = null;
     setMode("fallback");
+  };
+
+  const anchor = () => {
+    initialOrientationQ.current = currentOrientationQ.current.clone();
+    setAnchored(true);
+  };
+
+  const reanchor = () => {
+    initialOrientationQ.current = currentOrientationQ.current.clone();
+    // anchored stays true; the scene group will reset relative to new orientation next frame
   };
 
   return (
@@ -111,7 +155,7 @@ export function ARViewer({ manifests }: Props) {
           {/* Live camera feed as background */}
           <CameraFallback onReady={() => setCameraReady(true)} />
 
-          {/* 3D scene overlaid on the camera — transparent background so the video shows through */}
+          {/* 3D scene overlaid — transparent so the camera shows through */}
           <Canvas
             className="!absolute inset-0"
             camera={{ position: [0, 1, 2.5], fov: 60 }}
@@ -121,30 +165,44 @@ export function ARViewer({ manifests }: Props) {
             <ambientLight intensity={0.9} />
             <directionalLight position={[3, 5, 2]} intensity={1.2} />
             <Environment preset="city" />
-            {/*
-              OrbitControls makes the model feel world-anchored: drag to rotate the
-              camera around the model's position, pinch to zoom in/out.
-              - enablePan=false: prevents sliding the model off-screen
-              - maxPolarAngle=PI/2: prevents orbiting underground
-              - target: centre of the model arc (single model is always at z=-1.4)
-            */}
-            <OrbitControls
-              makeDefault
-              enablePan={false}
-              minDistance={0.5}
-              maxDistance={5}
-              maxPolarAngle={Math.PI / 2}
-              target={[0, 0.3, -1.4]}
+            {/* OrbitControls only active before anchoring */}
+            {!anchored && (
+              <OrbitControls
+                makeDefault
+                enablePan={false}
+                minDistance={0.5}
+                maxDistance={5}
+                maxPolarAngle={Math.PI / 2}
+                target={[0, 0.3, -1.4]}
+              />
+            )}
+            <AnchoredScene
+              manifests={manifests}
+              anchored={anchored}
+              currentOrientationQ={currentOrientationQ}
+              initialOrientationQ={initialOrientationQ}
             />
-            <Scene manifests={manifests} />
           </Canvas>
 
-          {/* Loading overlay until the first camera frame arrives */}
+          {/* Loading overlay until first camera frame */}
           {!cameraReady && (
             <div className="absolute inset-0 flex items-center justify-center bg-black/70 pointer-events-none">
               <p className="text-white/70 text-sm">Starting camera…</p>
             </div>
           )}
+
+          {/* Anchor controls */}
+          <div className="absolute bottom-6 inset-x-0 flex justify-center gap-3">
+            {!anchored ? (
+              <button className="btn-primary" onClick={anchor}>
+                Anchor models here
+              </button>
+            ) : (
+              <button className="btn-ghost" onClick={reanchor}>
+                Re-anchor
+              </button>
+            )}
+          </div>
 
           <div className="absolute top-3 right-3">
             <button className="btn-ghost" onClick={() => setMode("none")}>
@@ -157,8 +215,39 @@ export function ARViewer({ manifests }: Props) {
   );
 }
 
+// Wraps the scene group and applies DeviceOrientation counter-rotation when anchored
+function AnchoredScene({
+  manifests,
+  anchored,
+  currentOrientationQ,
+  initialOrientationQ,
+}: {
+  manifests: ARManifest[];
+  anchored: boolean;
+  currentOrientationQ: React.MutableRefObject<THREE.Quaternion>;
+  initialOrientationQ: React.MutableRefObject<THREE.Quaternion | null>;
+}) {
+  const groupRef = useRef<THREE.Group>(null);
+
+  useFrame(() => {
+    const g = groupRef.current;
+    if (!g || !anchored || !initialOrientationQ.current) return;
+    // qDelta = how much the device has rotated since anchoring
+    _qInitInv.copy(initialOrientationQ.current).invert();
+    _qDelta.multiplyQuaternions(currentOrientationQ.current, _qInitInv);
+    // Counter-rotate the scene so models appear world-fixed
+    g.quaternion.copy(_qDelta).invert();
+  });
+
+  return (
+    <group ref={groupRef}>
+      <Scene manifests={manifests} />
+    </group>
+  );
+}
+
+// Lays out models in a gentle arc and renders name labels above each
 function Scene({ manifests }: { manifests: ARManifest[] }) {
-  // Lay models out in a gentle arc so multiple students' models coexist.
   return (
     <>
       {manifests.map((m, i) => {
@@ -168,7 +257,29 @@ function Scene({ manifests }: { manifests: ARManifest[] }) {
         const r = 1.4;
         const x = Math.sin(angle) * r;
         const z = -Math.cos(angle) * r;
-        return <ARModel key={m.manifestId} manifest={m} position={[x, 0, z]} />;
+        const label = m.authorName ?? m.label;
+        return (
+          <group key={m.manifestId}>
+            <ARModel manifest={m} position={[x, 0, z]} />
+            {label && (
+              <Html position={[x, 0.85, z]} center distanceFactor={3}>
+                <div
+                  style={{
+                    color: "white",
+                    fontSize: "13px",
+                    fontWeight: 600,
+                    textShadow: "0 1px 4px rgba(0,0,0,0.9)",
+                    whiteSpace: "nowrap",
+                    pointerEvents: "none",
+                    userSelect: "none",
+                  }}
+                >
+                  {label}
+                </div>
+              </Html>
+            )}
+          </group>
+        );
       })}
     </>
   );

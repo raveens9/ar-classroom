@@ -54,3 +54,8 @@ export const WatchStudentPayloadSchema = z.object({
   studentId: z.string().min(1),
 });
 export type WatchStudentPayload = z.infer<typeof WatchStudentPayloadSchema>;
+
+export const CloseRoomPayloadSchema = z.object({
+  roomId: z.string().min(1),
+});
+export type CloseRoomPayload = z.infer<typeof CloseRoomPayloadSchema>;
