@@ -10,6 +10,8 @@ interface Props {
 }
 
 export default async function JoinPage({ params }: Props) {
+  // Opt every fetch in this render out of Next.js's data cache so the roster
+  // is always read fresh from the database, even after students are added.
   noStore();
   const { token } = await params;
   const supabase = createServiceClient();

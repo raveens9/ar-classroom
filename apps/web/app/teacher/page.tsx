@@ -202,12 +202,12 @@ export default function TeacherPage() {
     if (!room || !watchedStudentId || !prep.modelUrl) return;
     setBusy(true);
     try {
-      const authorName = room.students.find((s) => s.studentId === watchedStudentId)?.displayName;
+      const student = room.students.find((s) => s.studentId === watchedStudentId);
       const r = await mlApproveGenerateAR({
         roomId: room.roomId,
         studentId: watchedStudentId,
         authorId: watchedStudentId,
-        authorName,
+        authorName: student?.displayName,
         modelUrl: prep.modelUrl,
         textureUrl: prep.textureUrl,
         animationName: prep.suggestedAnimation,
@@ -385,6 +385,21 @@ export default function TeacherPage() {
                 )}
               </div>
             )}
+
+            <div className="card space-y-2">
+              <h2 className="font-medium text-sm">Classroom AR</h2>
+              <a
+                href="/arjs/hiro.png"
+                target="_blank"
+                rel="noreferrer"
+                className="btn-ghost w-full text-xs"
+              >
+                Print Hiro marker →
+              </a>
+              <p className="text-xs text-white/40">
+                Students point their camera at this marker to see all models anchored together.
+              </p>
+            </div>
 
             <div className="card">
               <h2 className="font-medium mb-2">Log</h2>

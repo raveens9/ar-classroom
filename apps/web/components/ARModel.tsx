@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
-import { useGLTF, useAnimations } from "@react-three/drei";
+import { useGLTF, useAnimations, Text } from "@react-three/drei";
 import { SkeletonUtils } from "three-stdlib";
 import * as THREE from "three";
 import type { ARManifest } from "@ar/shared";
@@ -10,10 +10,9 @@ import type { ARManifest } from "@ar/shared";
 interface Props {
   manifest: ARManifest;
   position?: [number, number, number];
-  // If provided, overrides auto-fit. Leave undefined to let ARModel size the model so
-  // its largest dimension ~= `targetSize` meters.
   scale?: number;
   targetSize?: number;
+  authorName?: string;
 }
 
 // Pick animation with fallback logic: exact name → includes → first available.
@@ -38,6 +37,7 @@ export function ARModel({
   position = [0, 0, -1.5],
   scale,
   targetSize = 0.6,
+  authorName,
 }: Props) {
   const group = useRef<THREE.Group>(null);
   // useGLTF caches by URL so re-renders are cheap.
@@ -70,7 +70,7 @@ export function ARModel({
 
   // Auto-fit: compute model's bounding box, derive a scale so its largest dimension
   // equals targetSize meters, and drop it so its feet rest on y=0.
-  const { autoScale, yOffset } = useMemo(() => {
+  const { autoScale, yOffset, localTopY } = useMemo(() => {
     const box = new THREE.Box3().setFromObject(scene);
     const size = new THREE.Vector3();
     const center = new THREE.Vector3();
@@ -78,12 +78,12 @@ export function ARModel({
     box.getCenter(center);
     const largest = Math.max(size.x, size.y, size.z);
     if (!isFinite(largest) || largest === 0) {
-      return { autoScale: 1, yOffset: 0 };
+      return { autoScale: 1, yOffset: 0, localTopY: 1 };
     }
     const s = targetSize / largest;
-    // After scaling, move so the model's y-min sits on 0 and x/z are centered.
     const yOff = -box.min.y * s;
-    return { autoScale: s, yOffset: yOff };
+    // localTopY: model's top edge in local (pre-scale) space, for label placement.
+    return { autoScale: s, yOffset: yOff, localTopY: box.max.y };
   }, [scene, targetSize]);
 
   const finalScale = scale ?? autoScale;
@@ -93,8 +93,6 @@ export function ARModel({
     if (group.current && !chosen) group.current.rotation.y += dt * 0.6;
   });
 
-  // IMPORTANT per spec: do NOT override original materials/textures. We render the
-  // cloned scene exactly as authored.
   return (
     <group
       ref={group}
@@ -103,6 +101,19 @@ export function ARModel({
       dispose={null}
     >
       <primitive object={scene} />
+      {authorName && (
+        <Text
+          position={[0, localTopY + 0.05 / finalScale, 0]}
+          fontSize={0.12 / finalScale}
+          color="white"
+          anchorX="center"
+          anchorY="bottom"
+          outlineWidth={0.005 / finalScale}
+          outlineColor="black"
+        >
+          {authorName}
+        </Text>
+      )}
     </group>
   );
 }

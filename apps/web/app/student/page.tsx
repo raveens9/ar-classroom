@@ -51,6 +51,9 @@ export default function StudentPage() {
     } catch (e) {
       const msg = (e as Error).message;
       if (msg === "Room not found") {
+        // The cached roomId is stale (server restarted). Clear it and fall into
+        // the polling loop — it will pick up the new roomId once the teacher's
+        // page has auto-recreated the room and updated the database.
         setRoomId("");
         setWaitingForRoom(true);
         try {
