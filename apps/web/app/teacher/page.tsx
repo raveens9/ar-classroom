@@ -103,13 +103,15 @@ export default function TeacherPage() {
   };
 
   const endSession = async () => {
-    if (!room || !sessionId) return;
-    if (!confirm("End the session? Students will be disconnected and the session will close.")) return;
+    if (!room) return;
+    if (!confirm("End the session? Students will be disconnected.")) return;
     setBusy(true);
     try {
       await emitAck("room:close", { roomId: room.roomId });
-      const supabase = createClient();
-      await supabase.from("sessions").update({ ended_at: new Date().toISOString() }).eq("id", sessionId);
+      if (sessionId) {
+        const supabase = createClient();
+        await supabase.from("sessions").update({ ended_at: new Date().toISOString() }).eq("id", sessionId);
+      }
       appendLog("Session ended");
       router.push("/dashboard");
     } catch (e) {
@@ -305,15 +307,13 @@ export default function TeacherPage() {
                   CLOSED
                 </button>
               </div>
-              {sessionId && (
-                <button
-                  className="btn-danger w-full mt-1"
-                  onClick={endSession}
-                  disabled={busy}
-                >
-                  End session
-                </button>
-              )}
+              <button
+                className="btn-danger w-full mt-1"
+                onClick={endSession}
+                disabled={busy}
+              >
+                End session
+              </button>
             </div>
           )}
         </div>

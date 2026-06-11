@@ -104,7 +104,7 @@ export function WebXRViewer({ session, manifests, onEnd }: Props) {
 
       placedRef.current = true;
       reticle.visible = false;
-      setHint("Placed — tap again to reposition");
+      setHint("Models placed");
     };
 
     // XR setup: reference space type must be set before setSession.
@@ -128,14 +128,8 @@ export function WebXRViewer({ session, manifests, onEnd }: Props) {
     });
 
     const onSelect = () => {
-      if (!preloaded) return;
-
-      if (placedRef.current) {
-        // Second tap re-enters scanning mode so the user can reposition.
-        placedRef.current = false;
-        setHint(hitTestSource ? "Point at a surface, then tap to reposition" : "Tap to reposition");
-        return;
-      }
+      // Once placed, the anchor is permanent — ignore subsequent taps.
+      if (!preloaded || placedRef.current) return;
 
       if (reticle.visible) {
         doPlace(new THREE.Matrix4().fromArray(reticle.matrix.elements));
