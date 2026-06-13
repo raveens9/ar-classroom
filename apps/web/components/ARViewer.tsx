@@ -132,7 +132,7 @@ export function ARViewer({ manifests }: Props) {
             </button>
             <p className="text-xs text-white/40">
               {xrSupport === "supported"
-                ? "Tap to place models on any surface — no marker needed."
+                ? "Tap dot A, then dot B on the printed anchor sheet — every device lines up on the same spot."
                 : "Point at the Hiro marker to place models."}
             </p>
             <button className="btn-ghost w-full" onClick={startFallback}>

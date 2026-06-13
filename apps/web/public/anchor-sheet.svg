@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1122 794" font-family="Helvetica, Arial, sans-serif">
+  <!-- A4 landscape proportions. Print at any size and lay flat — the exact
+       distance between the dots does not matter, only that everyone taps
+       the same two dots in the same order. -->
+  <rect width="1122" height="794" fill="white"/>
+
+  <text x="561" y="80" text-anchor="middle" font-size="36" font-weight="bold" fill="#111">
+    AR Anchor Sheet
+  </text>
+  <text x="561" y="125" text-anchor="middle" font-size="20" fill="#555">
+    Lay flat on a table or the floor. On each device, tap dot A first, then dot B.
+  </text>
+
+  <!-- Arrow from A to B -->
+  <line x1="330" y1="420" x2="770" y2="420" stroke="#999" stroke-width="6" stroke-dasharray="18 14"/>
+  <polygon points="770,400 810,420 770,440" fill="#999"/>
+
+  <!-- Dot A -->
+  <circle cx="280" cy="420" r="44" fill="#16a34a"/>
+  <text x="280" y="436" text-anchor="middle" font-size="44" font-weight="bold" fill="white">A</text>
+  <text x="280" y="520" text-anchor="middle" font-size="22" fill="#333">Tap first</text>
+
+  <!-- Dot B -->
+  <circle cx="860" cy="420" r="44" fill="#2563eb"/>
+  <text x="860" y="436" text-anchor="middle" font-size="44" font-weight="bold" fill="white">B</text>
+  <text x="860" y="520" text-anchor="middle" font-size="22" fill="#333">Tap second</text>
+
+  <text x="561" y="640" text-anchor="middle" font-size="20" fill="#555">
+    Models appear in the direction of the arrow, starting at dot A.
+  </text>
+  <text x="561" y="675" text-anchor="middle" font-size="18" fill="#888">
+    Print size doesn&#8217;t matter — farther-apart dots give better alignment.
+  </text>
+</svg>
