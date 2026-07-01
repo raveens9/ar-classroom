@@ -15,7 +15,7 @@
     "dev:shared": "npm run dev -w @ar/shared",
     "dev:web": "npm run dev -w @ar/web",
     "dev:realtime": "npm run dev -w @ar/realtime",
-    "dev:ml": "cd apps/ml-api && python -m uvicorn main:app --host 0.0.0.0 --port 8000 --reload --ssl-keyfile ../../certs/dev-key.pem --ssl-certfile ../../certs/dev-cert.pem",
+    "dev:ml": "cd apps/ml-api && .venv/Scripts/python main.py",
     "dev": "npm run build:shared && concurrently -n web,realtime -c cyan,magenta \"npm run dev:web\" \"npm run dev:realtime\"",
     "dev:full": "npm run build:shared && concurrently -n web,realtime,ml -c cyan,magenta,yellow \"npm run dev:web\" \"npm run dev:realtime\" \"npm run dev:ml\"",
     "build": "npm run build -ws --if-present",
