@@ -16,6 +16,7 @@ import type {
 import type {
   ARManifest,
   ARPublishPayload,
+  ARRestylePayload,
   ARRoomFeed,
   SubscribeARPayload,
 } from "./schemas/ar.js";
@@ -34,6 +35,7 @@ export interface ClientToServerEvents {
   "canvas:undo": (p: CanvasUndo, ack: (r: Ack<{ removed: true }>) => void) => void;
   "ar:publish": (p: ARPublishPayload, ack: (r: Ack<ARManifest>) => void) => void;
   "ar:subscribe": (p: SubscribeARPayload, ack: (r: Ack<ARRoomFeed>) => void) => void;
+  "ar:restyle": (p: ARRestylePayload, ack: (r: Ack<ARManifest>) => void) => void;
 }
 
 // Events: server -> client

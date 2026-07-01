@@ -16,6 +16,31 @@ interface LoadedModel {
   animations: THREE.AnimationClip[];
 }
 
+function makeNameLabel(text: string): THREE.Sprite {
+  const canvas = document.createElement("canvas");
+  canvas.width = 256;
+  canvas.height = 64;
+  const ctx = canvas.getContext("2d")!;
+  ctx.fillStyle = "rgba(0,0,0,0.65)";
+  ctx.beginPath();
+  if (ctx.roundRect) {
+    ctx.roundRect(4, 8, 248, 48, 12);
+  } else {
+    ctx.rect(4, 8, 248, 48);
+  }
+  ctx.fill();
+  ctx.fillStyle = "white";
+  ctx.font = "bold 28px sans-serif";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText(text, 128, 32, 240);
+  const texture = new THREE.CanvasTexture(canvas);
+  const mat = new THREE.SpriteMaterial({ map: texture, transparent: true, depthTest: false });
+  const sprite = new THREE.Sprite(mat);
+  sprite.scale.set(0.35, 0.088, 1);
+  return sprite;
+}
+
 function arcOffset(i: number, total: number): THREE.Vector3 {
   const t = total === 1 ? 0 : (i / (total - 1)) * 2 - 1;
   const angle = t * 0.8;
@@ -93,13 +118,21 @@ export function WebXRViewer({ session, manifests, onEnd }: Props) {
       scene.add(placedAnchor);
 
       preloaded.forEach(({ scene: model, animations }, i) => {
-        model.position.copy(arcOffset(i, manifests.length));
+        const offset = arcOffset(i, manifests.length);
+        model.position.copy(offset);
         if (animations.length > 0) {
           const mixer = new THREE.AnimationMixer(model);
           mixer.clipAction(animations[0]).play();
           mixers.push(mixer);
         }
         placedAnchor!.add(model);
+
+        const name = manifests[i]?.authorName ?? manifests[i]?.label;
+        if (name) {
+          const label = makeNameLabel(name);
+          label.position.set(offset.x, offset.y + 0.35, offset.z);
+          placedAnchor!.add(label);
+        }
       });
 
       placedRef.current = true;

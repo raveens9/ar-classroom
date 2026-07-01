@@ -20,6 +20,7 @@ class ApproveBody(BaseModel):
     roomId: str
     studentId: str
     authorId: str
+    authorName: Optional[str] = None
     modelUrl: str
     textureUrl: Optional[str] = None
     animationName: Optional[str] = None
@@ -31,6 +32,7 @@ def approve_generate_ar(body: ApproveBody):
     manifest = {
         "manifestId": uuid.uuid4().hex,
         "authorId": body.authorId,
+        "authorName": body.authorName,
         "modelUrl": body.modelUrl,
         "textureUrl": body.textureUrl,
         "animationName": body.animationName,

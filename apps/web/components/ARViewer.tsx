@@ -7,7 +7,6 @@ import * as THREE from "three";
 import type { ARManifest } from "@ar/shared";
 import { ARModel } from "./ARModel";
 import { CameraFallback } from "./CameraFallback";
-import { MarkerARViewer } from "./MarkerARViewer";
 import { WebXRViewer } from "./WebXRViewer";
 
 interface Props {
@@ -15,7 +14,7 @@ interface Props {
 }
 
 type XrSupport = "checking" | "supported" | "unsupported";
-type Mode = "xr" | "marker" | "fallback" | "none";
+type Mode = "xr" | "fallback" | "none";
 
 // Module-level scratch to avoid per-frame GC pressure
 const _euler = new THREE.Euler();
@@ -29,6 +28,7 @@ export function ARViewer({ manifests }: Props) {
   const [mode, setMode] = useState<Mode>("none");
   const [cameraReady, setCameraReady] = useState(false);
   const [anchored, setAnchored] = useState(false);
+  const [xrError, setXrError] = useState<string | null>(null);
   const canvasRef = useRef<HTMLDivElement | null>(null);
 
   // Updated every deviceorientation event; read inside Canvas via useFrame
@@ -73,6 +73,7 @@ export function ARViewer({ manifests }: Props) {
   const startXR = async () => {
     const xr = (navigator as Navigator & { xr?: XRSystem }).xr;
     if (!xr) return;
+    setXrError(null);
     try {
       const s = await xr.requestSession("immersive-ar", {
         requiredFeatures: ["local-floor"],
@@ -83,9 +84,14 @@ export function ARViewer({ manifests }: Props) {
       setMode("xr");
       s.addEventListener("end", () => { setSession(null); setMode("none"); });
     } catch (e) {
+      const err = e as Error;
       console.error("[ar] XR session failed", e);
-      // Fall back to AR.js marker mode if WebXR request fails.
-      setMode("marker");
+      setXrError(`${err.name || "Error"}: ${err.message || String(e)}`);
+      // Fall back to the camera view with manual anchor placement.
+      setCameraReady(false);
+      setAnchored(false);
+      initialOrientationQ.current = null;
+      setMode("fallback");
     }
   };
 
@@ -93,11 +99,12 @@ export function ARViewer({ manifests }: Props) {
     if (xrSupport === "supported") {
       startXR();
     } else {
-      setMode("marker");
+      startFallback();
     }
   };
 
   const startFallback = async () => {
+    setXrError(null);
     // iOS 13+ requires DeviceOrientation permission from a user-gesture context
     const doa = DeviceOrientationEvent as unknown as { requestPermission?: () => Promise<string> };
     if (typeof doa.requestPermission === "function") {
@@ -133,7 +140,7 @@ export function ARViewer({ manifests }: Props) {
             <p className="text-xs text-white/40">
               {xrSupport === "supported"
                 ? "Tap to place models on any surface — no marker needed."
-                : "Point at the Hiro marker to place models."}
+                : "Opens a camera view — drag to look around, then anchor the models in place."}
             </p>
             <button className="btn-ghost w-full" onClick={startFallback}>
               Camera view (no AR)
@@ -148,10 +155,6 @@ export function ARViewer({ manifests }: Props) {
           manifests={manifests}
           onEnd={() => { setSession(null); setMode("none"); }}
         />
-      )}
-
-      {mode === "marker" && (
-        <MarkerARViewer manifests={manifests} onClose={() => setMode("none")} />
       )}
 
       {mode === "fallback" && (
@@ -187,8 +190,13 @@ export function ARViewer({ manifests }: Props) {
           </Canvas>
 
           {!cameraReady && (
-            <div className="absolute inset-0 flex items-center justify-center bg-black/70 pointer-events-none">
+            <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-black/70 pointer-events-none px-6 text-center">
               <p className="text-white/70 text-sm">Starting camera…</p>
+              {xrError && (
+                <p className="text-red-300 text-xs">
+                  WebXR unavailable ({xrError}) — showing camera view instead.
+                </p>
+              )}
             </div>
           )}
 

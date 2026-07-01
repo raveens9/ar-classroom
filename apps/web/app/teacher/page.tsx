@@ -386,21 +386,6 @@ export default function TeacherPage() {
               </div>
             )}
 
-            <div className="card space-y-2">
-              <h2 className="font-medium text-sm">Classroom AR</h2>
-              <a
-                href="/arjs/hiro.png"
-                target="_blank"
-                rel="noreferrer"
-                className="btn-ghost w-full text-xs"
-              >
-                Print Hiro marker →
-              </a>
-              <p className="text-xs text-white/40">
-                Students point their camera at this marker to see all models anchored together.
-              </p>
-            </div>
-
             <div className="card">
               <h2 className="font-medium mb-2">Log</h2>
               <ul className="text-xs text-white/60 space-y-1 max-h-48 overflow-auto">

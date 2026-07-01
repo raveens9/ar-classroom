@@ -1,0 +1,123 @@
+{
+  "_comment": "Maps classifier class names to canonical .glb paths (relative to data/glb/). Also records material type and whether the model has animations — both affect the style-transfer code path.",
+  "_material_types": {
+    "TEXTURED": "PBR metallic-roughness with embedded texture image — main code path",
+    "FLAT":     "PBR metallic-roughness with baseColorFactor only, no texture image",
+    "MIXED":    "Some materials textured, some flat — both code paths needed",
+    "KHR_SPEC": "Legacy KHR_materials_pbrSpecularGlossiness extension — needs diffuseTexture extraction"
+  },
+
+  "alphabet": {
+    "A": { "glb": "Alphabet/A.glb", "material_type": "TEXTURED", "animated": false },
+    "B": { "glb": "Alphabet/B.glb", "material_type": "TEXTURED", "animated": false },
+    "C": { "glb": "Alphabet/C.glb", "material_type": "TEXTURED", "animated": false },
+    "D": { "glb": "Alphabet/D.glb", "material_type": "TEXTURED", "animated": false },
+    "E": { "glb": "Alphabet/E.glb", "material_type": "TEXTURED", "animated": false },
+    "F": { "glb": "Alphabet/F.glb", "material_type": "TEXTURED", "animated": false },
+    "G": { "glb": "Alphabet/G.glb", "material_type": "TEXTURED", "animated": false },
+    "H": { "glb": "Alphabet/H.glb", "material_type": "TEXTURED", "animated": false },
+    "I": { "glb": "Alphabet/I.glb", "material_type": "TEXTURED", "animated": false },
+    "J": { "glb": "Alphabet/J.glb", "material_type": "TEXTURED", "animated": false },
+    "K": { "glb": "Alphabet/K.glb", "material_type": "TEXTURED", "animated": false },
+    "L": { "glb": "Alphabet/L.glb", "material_type": "TEXTURED", "animated": false },
+    "M": { "glb": "Alphabet/M.glb", "material_type": "TEXTURED", "animated": false },
+    "N": { "glb": "Alphabet/N.glb", "material_type": "TEXTURED", "animated": false },
+    "O": { "glb": "Alphabet/O.glb", "material_type": "TEXTURED", "animated": false },
+    "P": { "glb": "Alphabet/P.glb", "material_type": "TEXTURED", "animated": false },
+    "Q": { "glb": "Alphabet/Q.glb", "material_type": "TEXTURED", "animated": false },
+    "R": { "glb": "Alphabet/R.glb", "material_type": "TEXTURED", "animated": false },
+    "S": { "glb": "Alphabet/S.glb", "material_type": "TEXTURED", "animated": false },
+    "T": { "glb": "Alphabet/T.glb", "material_type": "TEXTURED", "animated": false },
+    "U": { "glb": "Alphabet/U.glb", "material_type": "TEXTURED", "animated": false },
+    "V": { "glb": "Alphabet/V.glb", "material_type": "TEXTURED", "animated": false },
+    "W": { "glb": "Alphabet/W.glb", "material_type": "TEXTURED", "animated": false },
+    "X": { "glb": "Alphabet/X.glb", "material_type": "TEXTURED", "animated": false },
+    "Y": { "glb": "Alphabet/Y.glb", "material_type": "TEXTURED", "animated": false },
+    "Z": { "glb": "Alphabet/Z.glb", "material_type": "TEXTURED", "animated": false }
+  },
+
+  "animals": {
+    "butterfly": {
+      "glb":           "Animals/butterfly/ulysses_butterfly.glb",
+      "material_type": "TEXTURED",
+      "animated":      true,
+      "variants": [
+        { "glb": "Animals/butterfly/butterfly.glb",                               "material_type": "MIXED",    "note": "6 meshes, mixed materials" },
+        { "glb": "Animals/butterfly/animated_flying_fluttering_butterfly_loop.glb", "material_type": "KHR_SPEC", "note": "legacy specular-glossiness extension" }
+      ]
+    },
+    "cat": {
+      "glb":           "Animals/cat/cat.glb",
+      "material_type": "TEXTURED",
+      "animated":      true
+    },
+    "dinosaur": {
+      "glb":           "Animals/dinosaur/dinosaur.glb",
+      "material_type": "MIXED",
+      "animated":      true,
+      "variants": [
+        { "glb": "Animals/dinosaur/raptor_dinosaur_indoraptor.glb", "material_type": "MIXED", "note": "indoraptor variant" }
+      ]
+    },
+    "dog": {
+      "glb":           "Animals/dog/dog.glb",
+      "material_type": "TEXTURED",
+      "animated":      true
+    },
+    "fish": {
+      "glb":           "Animals/fish/fish.glb",
+      "material_type": "TEXTURED",
+      "animated":      true
+    }
+  },
+
+  "nature": {
+    "flower": {
+      "glb":           "Nature/daisy_flower.glb",
+      "material_type": "TEXTURED",
+      "animated":      true,
+      "variants": [
+        { "glb": "Nature/blue_flower_animated.glb", "material_type": "TEXTURED", "note": "blue variant, 22 animations" },
+        { "glb": "Nature/flower_animated.glb",      "material_type": "FLAT",     "note": "flat-colour, good for testing FLAT path" },
+        { "glb": "Nature/flower_lowpoly.glb",       "material_type": "TEXTURED", "note": "low-poly stylised" }
+      ]
+    },
+    "cloud": {
+      "glb":           "Nature/cloud__sun_lowpoly.glb",
+      "material_type": "FLAT",
+      "animated":      true,
+      "variants": [
+        { "glb": "Nature/cloud_animation.glb", "material_type": "FLAT", "note": "animated cloud only, no sun" }
+      ]
+    },
+    "rainbow": {
+      "glb":           "Nature/rainbow.glb",
+      "material_type": "FLAT",
+      "animated":      false
+    },
+    "rain": {
+      "glb":           "Nature/rain_2.glb",
+      "material_type": "MIXED",
+      "animated":      true
+    },
+    "tree": {
+      "glb":           "Nature/tree_animate.glb",
+      "material_type": "KHR_SPEC",
+      "animated":      true,
+      "variants": [
+        { "glb": "Nature/tree_oak.glb", "material_type": "KHR_SPEC", "note": "oak variant, static" }
+      ]
+    }
+  },
+
+  "vehicles": {
+    "boat": {
+      "glb":           "Vehicles/rowing_boat.glb",
+      "material_type": "TEXTURED",
+      "animated":      false,
+      "variants": [
+        { "glb": "Vehicles/herculaneum_boat_-_roman_boat.glb", "material_type": "TEXTURED", "note": "roman boat, 38 meshes, complex" }
+      ]
+    }
+  }
+}

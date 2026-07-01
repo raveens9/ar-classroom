@@ -29,3 +29,10 @@ export const SubscribeARPayloadSchema = z.object({
   studentId: z.string().min(1),
 });
 export type SubscribeARPayload = z.infer<typeof SubscribeARPayloadSchema>;
+
+export const ARRestylePayloadSchema = z.object({
+  roomId:         z.string().min(1),
+  manifestId:     z.string().min(1),
+  styledModelUrl: z.string().url(),
+});
+export type ARRestylePayload = z.infer<typeof ARRestylePayloadSchema>;

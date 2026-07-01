@@ -1,12 +1,13 @@
 import type { Server, Socket } from "socket.io";
 import {
   ARPublishPayloadSchema,
+  ARRestylePayloadSchema,
   SubscribeARPayloadSchema,
   type Ack,
   type ARManifest,
   type ARRoomFeed,
 } from "@ar/shared";
-import { getRoom, publishAR, arFeed } from "../state.js";
+import { getRoom, publishAR, arFeed, restyleAR } from "../state.js";
 import { assertTeacher } from "../util/auth.js";
 
 export function registerARHandlers(io: Server, socket: Socket): void {
@@ -35,6 +36,34 @@ export function registerARHandlers(io: Server, socket: Socket): void {
       roomId: parsed.data.roomId,
     });
     ack({ ok: true, data: parsed.data.manifest });
+  });
+
+  socket.on("ar:restyle", (raw, ack: (r: Ack<ARManifest>) => void) => {
+    const parsed = ARRestylePayloadSchema.safeParse(raw);
+    if (!parsed.success)
+      return ack({ ok: false, code: "BAD_REQUEST", message: parsed.error.message });
+
+    const state = getRoom(parsed.data.roomId);
+    if (!state) return ack({ ok: false, code: "NOT_FOUND", message: "Room not found" });
+
+    // Any socket subscribed to this room may restyle — covers both students who
+    // went through room:join and AR-only clients who subscribed via ar:subscribe.
+    if (!socket.rooms.has(parsed.data.roomId)) {
+      return ack({ ok: false, code: "FORBIDDEN", message: "Not subscribed to this room" });
+    }
+
+    // Any admitted student may restyle any manifest — the result broadcasts to all.
+    const updated = restyleAR(
+      parsed.data.roomId,
+      parsed.data.manifestId,
+      parsed.data.styledModelUrl,
+    );
+    if (!updated)
+      return ack({ ok: false, code: "NOT_FOUND", message: "Manifest not found" });
+
+    // Broadcast to everyone in the room so all students see the update.
+    io.to(parsed.data.roomId).emit("ar:new", { ...updated, roomId: parsed.data.roomId });
+    ack({ ok: true, data: updated });
   });
 
   socket.on("ar:subscribe", (raw, ack: (r: Ack<ARRoomFeed>) => void) => {

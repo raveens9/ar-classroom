@@ -16,12 +16,7 @@ apps/ml-api/app/static/textures/
 coverage
 .turbo
 
-# 3D model assets (large binaries, managed outside git)
-apps/web/public/Alphabet/
-apps/web/public/Animals/
-apps/web/public/Nature/
-apps/web/public/Vehicles/
-apps/web/public/Home/
+# 3D model assets are tracked via Git LFS (.gitattributes) — do NOT add these back
 
 # TypeScript incremental build cache
 apps/web/tsconfig.tsbuildinfo

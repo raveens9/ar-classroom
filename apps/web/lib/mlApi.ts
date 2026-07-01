@@ -82,6 +82,28 @@ export async function mlPrepareTextureModel(args: {
   };
 }
 
+export interface StylizeResponse {
+  ok: boolean;
+  styled_url: string;
+}
+
+export async function mlStylize(args: {
+  modelUrl: string;
+  drawingUrl?: string;
+  styleChoice: string;
+  intensity?: number;
+  tier?: number;
+}): Promise<string> {
+  const res = await post<StylizeResponse>("/v1/stylize", {
+    model_url: args.modelUrl,
+    drawing_url: args.drawingUrl,
+    style_choice: args.styleChoice,
+    intensity: args.intensity ?? 0.8,
+    tier: args.tier ?? 12,
+  });
+  return rewriteHost(res.styled_url);
+}
+
 export async function mlApproveGenerateAR(args: {
   roomId: string;
   studentId: string;

@@ -1,0 +1,37 @@
+# Python 3.13  |  Primary runtime: Apple Silicon MPS (never CUDA)
+# Install: pip install -r requirements.txt
+
+# Deep learning — MPS backend (Apple Silicon)
+# PyTorch 2.6+ required for Python 3.13 support
+torch==2.6.0
+torchvision==0.21.0
+
+# 3D / glTF I/O
+trimesh==4.4.3
+pygltflib==1.16.2
+numpy==2.2.3
+Pillow==11.1.0
+
+# Colour science
+scikit-learn==1.6.1
+scikit-image==0.25.2
+
+# API serving
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+python-multipart==0.0.20
+
+# Testing
+pytest==8.3.4
+httpx==0.28.1          # FastAPI TestClient transport
+
+# Evaluation & visualisation
+matplotlib==3.10.1
+tqdm==4.67.1
+scipy==1.17.1          # wasserstein_distance for EMD metric
+
+# ---------------------------------------------------------------------------
+# Colab / CUDA only — DO NOT install locally on Apple Silicon
+# ---------------------------------------------------------------------------
+# pytorch3d          # CUDA GPU rasteriser — install on Colab via pip
+# nvdiffrast         # CUDA differentiable rasteriser — Colab only
