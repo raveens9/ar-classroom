@@ -3,6 +3,9 @@ import { z } from "zod";
 export const RoomModeSchema = z.enum(["OPEN", "CLOSED"]);
 export type RoomMode = z.infer<typeof RoomModeSchema>;
 
+export const TopicSchema = z.enum(["animals", "nature"]);
+export type Topic = z.infer<typeof TopicSchema>;
+
 export const AdmissionStateSchema = z.enum(["WAITING", "ADMITTED", "REMOVED"]);
 export type AdmissionState = z.infer<typeof AdmissionStateSchema>;
 
@@ -19,6 +22,7 @@ export const RoomSchema = z.object({
   roomId: z.string().min(1),
   teacherId: z.string().min(1),
   mode: RoomModeSchema,
+  topic: TopicSchema.default("animals"),
   createdAt: z.number().int().nonnegative(),
   students: z.array(StudentPresenceSchema),
 });
@@ -27,6 +31,7 @@ export type Room = z.infer<typeof RoomSchema>;
 export const CreateRoomPayloadSchema = z.object({
   teacherId: z.string().min(1),
   mode: RoomModeSchema,
+  topic: TopicSchema.optional().default("animals"),
 });
 export type CreateRoomPayload = z.infer<typeof CreateRoomPayloadSchema>;
 

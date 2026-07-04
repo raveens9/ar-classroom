@@ -64,8 +64,8 @@ export async function mlRemoveBackground(imageDataUrl: string, studentId: string
   return { ...res, cutoutUrl: rewriteHost(res.cutoutUrl) };
 }
 
-export async function mlClassify(cutoutUrl: string, studentId: string) {
-  return post<ClassifyResponse>("/v1/classify", { cutoutUrl, studentId });
+export async function mlClassify(cutoutUrl: string, studentId: string, topic: string = "animals") {
+  return post<ClassifyResponse>("/v1/classify", { cutoutUrl, studentId, topic });
 }
 
 export async function mlPrepareTextureModel(args: {

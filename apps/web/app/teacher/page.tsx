@@ -12,7 +12,7 @@ import {
   mlPrepareTextureModel,
   mlRemoveBackground,
 } from "@/lib/mlApi";
-import type { Room, RoomMode } from "@ar/shared";
+import type { Room, RoomMode, Topic } from "@ar/shared";
 
 function dataUrlToBlob(dataUrl: string): Blob {
   const [header, data] = dataUrl.split(",");
@@ -31,6 +31,7 @@ export default function TeacherPage() {
   const [teacherId, setTeacherId] = useState<string>("");
   const [room, setRoom] = useState<Room | null>(null);
   const [mode, setMode] = useState<RoomMode>("OPEN");
+  const [topic, setTopic] = useState<Topic>("animals");
   const [watchedStudentId, setWatchedStudentId] = useState<string | null>(null);
   const [color, setColor] = useState("#f472b6");
   const [size, setSize] = useState(5);
@@ -47,26 +48,6 @@ export default function TeacherPage() {
     textureUrl?: string;
   }>({});
 
-  const hasAutoCreated = useRef(false);
-  useEffect(() => {
-    if (!teacherId || !sessionId || hasAutoCreated.current) return;
-    hasAutoCreated.current = true;
-    let cancelled = false;
-
-    emitAck("room:create", { teacherId, mode: "OPEN" })
-      .then(async (r) => {
-        if (cancelled) return;
-        setRoom(r);
-        appendLog(`Room ready: ${r.roomId}`);
-        const supabase = createClient();
-        await supabase.from("sessions").update({ socket_room_id: r.roomId }).eq("id", sessionId);
-      })
-      .catch((e) => {
-        if (!cancelled) appendLog(`ERR auto-create: ${(e as Error).message}`);
-      });
-
-    return () => { cancelled = true; };
-  }, [teacherId, sessionId]);
 
   useEffect(() => {
     const supabase = createClient();
@@ -89,7 +70,7 @@ export default function TeacherPage() {
   const createRoom = async () => {
     if (!teacherId) return;
     try {
-      const r = await emitAck("room:create", { teacherId, mode });
+      const r = await emitAck("room:create", { teacherId, mode, topic });
       setRoom(r);
       appendLog(`Created room ${r.roomId} (${r.mode})`);
 
@@ -125,7 +106,7 @@ export default function TeacherPage() {
     setMode(m);
     if (!room) return;
     try {
-      const r = await emitAck("room:create", { teacherId, mode: m });
+      const r = await emitAck("room:create", { teacherId, mode: m, topic: room?.topic ?? topic });
       setRoom(r);
       appendLog(`Room mode → ${m}`);
     } catch (e) {
@@ -181,7 +162,7 @@ export default function TeacherPage() {
       const r = await mlRemoveBackground(dataUrl, watchedStudentId);
       setPrep((p) => ({ ...p, cutoutUrl: r.cutoutUrl }));
       appendLog(`Remove BG OK → ${r.cutoutId}`);
-      const c = await mlClassify(r.cutoutUrl, watchedStudentId);
+      const c = await mlClassify(r.cutoutUrl, watchedStudentId, room?.topic ?? "animals");
       const suggested = c.suggestedAnimation;
       setPrep((p) => ({ ...p, label: c.label, suggestedAnimation: suggested }));
       appendLog(`Classify → ${c.label} (${c.confidence})`);
@@ -275,16 +256,26 @@ export default function TeacherPage() {
           <p className="text-xs text-white/50 break-all">id: {teacherId}</p>
           {sessionId && <p className="text-xs text-white/30">session: {sessionId}</p>}
           {!room ? (
-            <div className="mt-3 flex gap-2">
-              <select
-                value={mode}
-                onChange={(e) => setMode(e.target.value as RoomMode)}
-                className="bg-white/10 rounded px-2 py-1 text-sm"
-              >
-                <option value="OPEN">OPEN</option>
-                <option value="CLOSED">CLOSED</option>
-              </select>
-              <button className="btn-primary" onClick={createRoom}>
+            <div className="mt-3 space-y-2">
+              <div className="flex gap-2">
+                <select
+                  value={topic}
+                  onChange={(e) => setTopic(e.target.value as Topic)}
+                  className="bg-white/10 rounded px-2 py-1 text-sm flex-1"
+                >
+                  <option value="animals">🐾 Animals</option>
+                  <option value="nature">🌿 Nature</option>
+                </select>
+                <select
+                  value={mode}
+                  onChange={(e) => setMode(e.target.value as RoomMode)}
+                  className="bg-white/10 rounded px-2 py-1 text-sm"
+                >
+                  <option value="OPEN">OPEN</option>
+                  <option value="CLOSED">CLOSED</option>
+                </select>
+              </div>
+              <button className="btn-primary w-full" onClick={createRoom}>
                 Create room
               </button>
             </div>
@@ -292,6 +283,9 @@ export default function TeacherPage() {
             <div className="mt-3 text-sm space-y-2">
               <div>
                 Room <span className="font-mono">{room.roomId}</span>
+              </div>
+              <div className="text-xs text-white/50">
+                Topic: <span className="capitalize text-white/80">{room.topic === "nature" ? "🌿 Nature" : "🐾 Animals"}</span>
               </div>
               <div className="flex gap-2">
                 <button

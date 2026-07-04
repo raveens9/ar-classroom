@@ -25,3 +25,8 @@ apps/web/public/Home/
 
 # TypeScript incremental build cache
 apps/web/tsconfig.tsbuildinfo
+
+apps/ml-api/app/models
+apps/style-transfer/backend/__pycache__
+apps/style-transfer/backend/routes/__pycache__
+apps/ml-api/app/static

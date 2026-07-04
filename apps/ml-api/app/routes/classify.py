@@ -1,14 +1,13 @@
 """POST /v1/classify
 
-Runs the student's cutout through image_classifier.keras (28×28 greyscale CNN,
-4-class softmax). Classifier classes are temporarily proxied to available 3D
-model labels until matching GLB assets are ready.
+Runs the student's cutout through the correct QuickDraw CNN based on the room topic:
+  - topic="animals"  → image_classifier_fyp.keras    (butterfly, cat, dog, fish)
+  - topic="nature"   → image_classifier_nature.keras  (cloud, flower, rain, rainbow, sun, tree)
 """
 from __future__ import annotations
 
 import io
 import logging
-import os
 from pathlib import Path
 from typing import Optional
 
@@ -21,59 +20,85 @@ from pydantic import BaseModel
 router = APIRouter()
 log = logging.getLogger("ml-api.classify")
 
-MODEL_PATH = Path(__file__).resolve().parent.parent / "models" / "image_classifier.keras"
+_MODELS_DIR = Path(__file__).resolve().parent.parent / "models"
 
-# ── Class order must match training label indices 0-3 ─────────────────────────
-CLASSIFIER_LABELS: list[str] = ["apple", "banana", "aeroplane", "axe"]
-
-# ── Temporary proxy: swap out entries once matching GLB assets exist ───────────
-PROXY_TO_3D: dict[str, str] = {
-    "apple":     "cat",
-    "banana":    "dog",
-    "aeroplane": "bird",
-    "axe":       "robot",
+TOPIC_CONFIG: dict[str, dict] = {
+    "animals": {
+        "path": _MODELS_DIR / "image_classifier_fyp.keras",
+        "classes": ["butterfly", "cat", "dog", "fish"],
+        "anim": {"butterfly": "fly", "cat": "walk", "dog": "run", "fish": "swim"},
+    },
+    "nature": {
+        "path": _MODELS_DIR / "image_classifier_nature.keras",
+        "classes": ["cloud", "flower", "rain", "rainbow", "sun", "tree"],
+        "anim": {"cloud": "idle", "flower": "idle", "rain": "idle", "rainbow": "idle", "sun": "idle", "tree": "idle"},
+    },
 }
 
-ANIM_MAP: dict[str, str] = {
-    "cat": "walk", "dog": "run", "dragon": "jump", "robot": "walk",
-    "dinosaur": "run", "bird": "fly", "fish": "swim",
-}
-
-# Lazy-loaded singleton — model loads on first request, stays in memory after.
-_model = None
+_models: dict[str, object] = {}
 
 
-def _get_model():
-    global _model
-    if _model is None:
-        os.environ.setdefault("KERAS_BACKEND", "numpy")
-        import keras  # noqa: PLC0415 — deferred so KERAS_BACKEND is set first
-        log.info("Loading classifier from %s", MODEL_PATH)
-        _model = keras.models.load_model(str(MODEL_PATH))
-        log.info("Classifier ready")
-    return _model
+def _get_model(topic: str):
+    if topic not in _models:
+        import tensorflow as tf
+        cfg = TOPIC_CONFIG[topic]
+        log.info("Loading %s classifier from %s", topic, cfg["path"])
+        _models[topic] = tf.keras.models.load_model(str(cfg["path"]))
+        log.info("%s classifier ready — classes: %s", topic, cfg["classes"])
+    return _models[topic]
 
 
 def _preprocess(img_bytes: bytes) -> np.ndarray:
-    """Composite cutout on white, resize to 28×28 greyscale float32 [0,1].
-
-    If your training data used white strokes on a black background (Quick Draw style),
-    set CLASSIFIER_INVERT=true in your .env to flip the image before inference.
+    """
+    Convert any canvas drawing into the 28x28 float32 array the QuickDraw models expect.
+    Works for dark or white canvas backgrounds, any stroke colour.
     """
     img = Image.open(io.BytesIO(img_bytes)).convert("RGBA")
-    bg = Image.new("RGBA", img.size, (255, 255, 255, 255))
-    bg.paste(img, mask=img.split()[3])
-    grey = bg.convert("L").resize((28, 28), Image.LANCZOS)
-    arr = np.array(grey, dtype="float32").reshape(1, 28, 28, 1) / 255.0
-    if os.getenv("CLASSIFIER_INVERT", "false").lower() == "true":
-        arr = 1.0 - arr
-    return arr
+    white_bg = Image.new("RGBA", img.size, (255, 255, 255, 255))
+    white_bg.paste(img, mask=img.split()[3])
+    grey = np.array(white_bg.convert("L"), dtype="float32")
+
+    h, w = grey.shape
+
+    # Detect background using histogram — the most common grey level is background.
+    # Works for dark canvas (background≈20) AND white canvas (background≈255).
+    hist, bin_edges = np.histogram(grey.flatten(), bins=32, range=(0.0, 256.0))
+    bg_bin = int(np.argmax(hist))
+    bg_value = (bin_edges[bg_bin] + bin_edges[bg_bin + 1]) / 2.0
+    log.info("background detected at grey=%.0f", bg_value)
+
+    ink_mask = np.abs(grey - bg_value) > 35
+
+    if not ink_mask.any():
+        log.warning("No ink detected — returning blank array")
+        return np.zeros((1, 28, 28, 1), dtype="float32")
+
+    rows = np.where(np.any(ink_mask, axis=1))[0]
+    cols = np.where(np.any(ink_mask, axis=0))[0]
+    pad = max(4, int(max(h, w) * 0.04))
+    r0 = max(0, rows[0] - pad)
+    r1 = min(h, rows[-1] + pad + 1)
+    c0 = max(0, cols[0] - pad)
+    c1 = min(w, cols[-1] + pad + 1)
+    ink_crop = ink_mask[r0:r1, c0:c1]
+
+    binary = (ink_crop * 255).astype("uint8")
+    resized = Image.fromarray(binary).resize((28, 28), Image.LANCZOS)
+    arr = np.array(resized, dtype="float32") / 255.0
+
+    # DEBUG: save the 28x28 image the model actually sees — check /static/debug_input.png
+    debug_path = Path(__file__).resolve().parents[1] / "static" / "debug_input.png"
+    Image.fromarray((arr.reshape(28, 28) * 255).astype("uint8")).resize((200, 200), Image.NEAREST).save(str(debug_path))
+    log.info("DEBUG input saved → open http://localhost:8000/static/debug_input.png")
+
+    return arr.reshape(1, 28, 28, 1)
 
 
 class ClassifyBody(BaseModel):
     cutoutUrl: Optional[str] = None
     imageDataUrl: Optional[str] = None
     studentId: Optional[str] = None
+    topic: Optional[str] = "animals"
 
 
 @router.post("/classify")
@@ -81,7 +106,11 @@ async def classify(body: ClassifyBody):
     if not body.cutoutUrl:
         raise HTTPException(status_code=422, detail="cutoutUrl is required")
 
-    # Fetch the cutout image from the ML API's own /static endpoint.
+    topic = body.topic if body.topic in TOPIC_CONFIG else "animals"
+    cfg = TOPIC_CONFIG[topic]
+    class_names: list[str] = cfg["classes"]
+    anim_map: dict[str, str] = cfg["anim"]
+
     try:
         async with httpx.AsyncClient(verify=False, timeout=15.0) as client:
             resp = await client.get(body.cutoutUrl)
@@ -90,28 +119,25 @@ async def classify(body: ClassifyBody):
     except Exception as exc:
         raise HTTPException(status_code=502, detail=f"Failed to fetch cutout: {exc}") from exc
 
-    # Preprocess and run inference.
     try:
         arr = _preprocess(img_bytes)
-        probs: np.ndarray = _get_model().predict(arr, verbose=0)[0]
+        probs: np.ndarray = _get_model(topic).predict(arr, verbose=0)[0]
     except Exception as exc:
         log.exception("Inference failed")
         raise HTTPException(status_code=500, detail=f"Inference error: {exc}") from exc
 
-    # Rank predictions and proxy to available 3D model labels.
     ranked = np.argsort(probs)[::-1]
-    predicted_class = CLASSIFIER_LABELS[int(ranked[0])]
+    label = class_names[int(ranked[0])]
     confidence = float(probs[int(ranked[0])])
-    label = PROXY_TO_3D.get(predicted_class, "cat")
-    candidates = [PROXY_TO_3D.get(CLASSIFIER_LABELS[int(i)], "cat") for i in ranked[1:]]
+    candidates = [class_names[int(i)] for i in ranked[1:]]
 
-    all_probs = {CLASSIFIER_LABELS[int(i)]: round(float(probs[int(i)]), 3) for i in range(len(CLASSIFIER_LABELS))}
-    log.info("classify probs: %s → winner: %s (%.2f) → 3D label '%s'", all_probs, predicted_class, confidence, label)
+    all_probs = {class_names[int(i)]: round(float(probs[int(i)]), 3) for i in range(len(class_names))}
+    log.info("topic=%s probs=%s  winner=%s (%.0f%%)", topic, all_probs, label, confidence * 100)
 
     return {
         "ok": True,
         "label": label,
         "confidence": round(confidence, 3),
-        "suggestedAnimation": ANIM_MAP.get(label, "idle"),
+        "suggestedAnimation": anim_map.get(label, "idle"),
         "candidates": candidates,
     }

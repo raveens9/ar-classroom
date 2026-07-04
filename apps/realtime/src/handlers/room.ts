@@ -27,7 +27,7 @@ export function registerRoomHandlers(io: Server, socket: Socket): void {
     if (!parsed.success) {
       return ack({ ok: false, code: "BAD_REQUEST", message: parsed.error.message });
     }
-    const { teacherId, mode } = parsed.data;
+    const { teacherId, mode, topic } = parsed.data;
 
     // Teacher reconnecting to their existing room is allowed (idempotent).
     const existing = findRoomByTeacher(teacherId);
@@ -35,11 +35,12 @@ export function registerRoomHandlers(io: Server, socket: Socket): void {
       roomId: nanoid(8),
       teacherId,
       mode,
+      topic,
       createdAt: Date.now(),
       students: [],
     };
     if (!existing) createRoom(room);
-    else room.mode = mode;
+    else { room.mode = mode; room.topic = topic; }
 
     socket.data.role = "teacher";
     socket.data.teacherId = teacherId;
