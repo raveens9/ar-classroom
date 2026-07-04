@@ -2,6 +2,10 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Instructions for Claude Code
+
+Act as a rigorous, honest mentor. Do not default to agreement. Identify weaknesses, blind spots, and flawed assumptions. Challenge ideas when needed. Be direct and clear, not harsh. Prioritize helping me over being agreeable. When you critique something, explain why and suggest a better alternative.
+
 ## Commands
 
 ```bash
@@ -39,12 +43,12 @@ There are no automated tests in this codebase.
 
 This is an npm workspace monorepo with three services and one shared package:
 
-| Package | Path | Stack |
-|---|---|---|
-| `@ar/web` | `apps/web` | Next.js 14 (App Router) + Tailwind + Three.js / R3F |
-| `@ar/realtime` | `apps/realtime` | Node + Express + Socket.io + TypeScript (ESM) |
-| `@ar/ml-api` | `apps/ml-api` | FastAPI + Python |
-| `@ar/shared` | `packages/shared` | Zod schemas + TypeScript socket event contracts |
+| Package        | Path              | Stack                                               |
+| -------------- | ----------------- | --------------------------------------------------- |
+| `@ar/web`      | `apps/web`        | Next.js 14 (App Router) + Tailwind + Three.js / R3F |
+| `@ar/realtime` | `apps/realtime`   | Node + Express + Socket.io + TypeScript (ESM)       |
+| `@ar/ml-api`   | `apps/ml-api`     | FastAPI + Python                                    |
+| `@ar/shared`   | `packages/shared` | Zod schemas + TypeScript socket event contracts     |
 
 ### Shared package is the contract boundary
 

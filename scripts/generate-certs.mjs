@@ -16,7 +16,8 @@ const certPath = join(certDir, "dev-cert.pem");
 if (!existsSync(certDir)) mkdirSync(certDir, { recursive: true });
 
 function has(cmd) {
-  const r = spawnSync("which", [cmd], { encoding: "utf8" });
+  const finder = process.platform === "win32" ? "where" : "which";
+  const r = spawnSync(finder, [cmd], { encoding: "utf8" });
   return r.status === 0 && r.stdout.trim().length > 0;
 }
 

@@ -5,12 +5,14 @@ import {
   JoinRoomPayloadSchema,
   AdmitStudentPayloadSchema,
   RemoveStudentPayloadSchema,
+  CloseRoomPayloadSchema,
   type Room,
   type Ack,
 } from "@ar/shared";
 import {
   createRoom,
   getRoom,
+  deleteRoom,
   upsertStudent,
   admitStudent,
   setAdmissionRemoved,
@@ -25,7 +27,7 @@ export function registerRoomHandlers(io: Server, socket: Socket): void {
     if (!parsed.success) {
       return ack({ ok: false, code: "BAD_REQUEST", message: parsed.error.message });
     }
-    const { teacherId, mode } = parsed.data;
+    const { teacherId, mode, topic } = parsed.data;
 
     // Teacher reconnecting to their existing room is allowed (idempotent).
     const existing = findRoomByTeacher(teacherId);
@@ -33,11 +35,12 @@ export function registerRoomHandlers(io: Server, socket: Socket): void {
       roomId: nanoid(8),
       teacherId,
       mode,
+      topic,
       createdAt: Date.now(),
       students: [],
     };
     if (!existing) createRoom(room);
-    else room.mode = mode;
+    else { room.mode = mode; room.topic = topic; }
 
     socket.data.role = "teacher";
     socket.data.teacherId = teacherId;
@@ -95,6 +98,24 @@ export function registerRoomHandlers(io: Server, socket: Socket): void {
 
     io.to(parsed.data.roomId).emit("room:state", updated);
     ack({ ok: true, data: updated });
+  });
+
+  socket.on("room:close", (raw, ack: (r: Ack<{ closed: true }>) => void) => {
+    const parsed = CloseRoomPayloadSchema.safeParse(raw);
+    if (!parsed.success) {
+      return ack({ ok: false, code: "BAD_REQUEST", message: parsed.error.message });
+    }
+    const state = getRoom(parsed.data.roomId);
+    if (!state) return ack({ ok: false, code: "NOT_FOUND", message: "Room not found" });
+    const err = assertTeacher(socket, state.room);
+    if (err) return ack({ ok: false, ...err });
+
+    io.to(parsed.data.roomId).emit("room:closed", {
+      roomId: parsed.data.roomId,
+      reason: "Teacher ended the session",
+    });
+    deleteRoom(parsed.data.roomId);
+    ack({ ok: true, data: { closed: true } });
   });
 
   socket.on("room:remove", (raw, ack: (r: Ack<Room>) => void) => {

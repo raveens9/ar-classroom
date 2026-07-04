@@ -47,6 +47,7 @@ export interface ApproveResponse {
   manifest: {
     manifestId: string;
     authorId: string;
+    authorName?: string | null;
     modelUrl: string;
     textureUrl?: string | null;
     animationName?: string | null;
@@ -63,8 +64,8 @@ export async function mlRemoveBackground(imageDataUrl: string, studentId: string
   return { ...res, cutoutUrl: rewriteHost(res.cutoutUrl) };
 }
 
-export async function mlClassify(cutoutUrl: string, studentId: string) {
-  return post<ClassifyResponse>("/v1/classify", { cutoutUrl, studentId });
+export async function mlClassify(cutoutUrl: string, studentId: string, topic: string = "animals") {
+  return post<ClassifyResponse>("/v1/classify", { cutoutUrl, studentId, topic });
 }
 
 export async function mlPrepareTextureModel(args: {
@@ -81,10 +82,33 @@ export async function mlPrepareTextureModel(args: {
   };
 }
 
+export interface StylizeResponse {
+  ok: boolean;
+  styled_url: string;
+}
+
+export async function mlStylize(args: {
+  modelUrl: string;
+  drawingUrl?: string;
+  styleChoice: string;
+  intensity?: number;
+  tier?: number;
+}): Promise<string> {
+  const res = await post<StylizeResponse>("/v1/stylize", {
+    model_url: args.modelUrl,
+    drawing_url: args.drawingUrl,
+    style_choice: args.styleChoice,
+    intensity: args.intensity ?? 0.8,
+    tier: args.tier ?? 12,
+  });
+  return rewriteHost(res.styled_url);
+}
+
 export async function mlApproveGenerateAR(args: {
   roomId: string;
   studentId: string;
   authorId: string;
+  authorName?: string;
   modelUrl: string;
   textureUrl?: string;
   animationName?: string;
@@ -100,6 +124,7 @@ export async function mlApproveGenerateAR(args: {
     manifest: {
       manifestId: m.manifestId,
       authorId: m.authorId,
+      authorName: m.authorName ?? args.authorName ?? undefined,
       modelUrl: rewriteHost(m.modelUrl),
       textureUrl: m.textureUrl ? rewriteHost(m.textureUrl) : undefined,
       animationName: m.animationName ?? undefined,

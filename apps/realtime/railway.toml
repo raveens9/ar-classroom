@@ -1,0 +1,7 @@
+[build]
+buildCommand = "npm ci && npm run build:shared && npm run build -w @ar/realtime"
+
+[deploy]
+startCommand = "node apps/realtime/dist/index.js"
+healthcheckPath = "/healthz"
+restartPolicyType = "on_failure"

@@ -146,6 +146,23 @@ export function publishAR(roomId: string, manifest: ARManifest): ARManifest[] | 
   return state.arOrder.map((a) => state.arByAuthor.get(a)!).filter(Boolean);
 }
 
+export function restyleAR(
+  roomId: string,
+  manifestId: string,
+  styledModelUrl: string,
+): ARManifest | null {
+  const state = rooms.get(roomId);
+  if (!state) return null;
+  for (const [authorId, manifest] of state.arByAuthor) {
+    if (manifest.manifestId === manifestId) {
+      const updated = { ...manifest, modelUrl: styledModelUrl };
+      state.arByAuthor.set(authorId, updated);
+      return updated;
+    }
+  }
+  return null;
+}
+
 export function arFeed(roomId: string): ARManifest[] {
   const state = rooms.get(roomId);
   if (!state) return [];

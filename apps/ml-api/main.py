@@ -24,7 +24,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
-from app.routes import remove_bg, classify, prepare_texture, approve_generate
+from app.routes import remove_bg, classify, prepare_texture, approve_generate, stylize
 
 load_dotenv()
 
@@ -37,6 +37,7 @@ STATIC_DIR.mkdir(parents=True, exist_ok=True)
 (STATIC_DIR / "cutouts").mkdir(exist_ok=True)
 (STATIC_DIR / "models").mkdir(exist_ok=True)
 (STATIC_DIR / "textures").mkdir(exist_ok=True)
+(STATIC_DIR / "styled").mkdir(exist_ok=True)
 
 app = FastAPI(title="AR Platform ML API", version="0.1.0")
 
@@ -54,6 +55,7 @@ app.include_router(remove_bg.router, prefix="/v1")
 app.include_router(classify.router, prefix="/v1")
 app.include_router(prepare_texture.router, prefix="/v1")
 app.include_router(approve_generate.router, prefix="/v1")
+app.include_router(stylize.router, prefix="/v1")
 
 
 @app.get("/healthz")

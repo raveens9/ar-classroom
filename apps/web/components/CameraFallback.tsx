@@ -18,12 +18,25 @@ interface Props {
  */
 export function CameraFallback({ onReady }: Props) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  const watchdogRef = useRef<number | null>(null);
   const [isReady, setIsReady] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
   useEffect(() => {
     let stream: MediaStream | null = null;
     let cancelled = false;
+
+    // getUserMedia() can hang forever with no rejection on pages the browser
+    // flags with a certificate error (the permission prompt is silently
+    // suppressed). Surface that case instead of leaving "Starting camera…" up forever.
+    watchdogRef.current = window.setTimeout(() => {
+      if (cancelled) return;
+      setErr(
+        `Camera hasn't started after 8s (isSecureContext=${window.isSecureContext}). ` +
+          `If the address bar shows "Not secure", the camera permission prompt may be ` +
+          `blocked — run "npm run cert:generate" and reload.`
+      );
+    }, 8000);
 
     (async () => {
       try {
@@ -67,6 +80,7 @@ export function CameraFallback({ onReady }: Props) {
 
     return () => {
       cancelled = true;
+      if (watchdogRef.current !== null) window.clearTimeout(watchdogRef.current);
       if (stream) stream.getTracks().forEach((t) => t.stop());
     };
   }, []);
@@ -79,6 +93,10 @@ export function CameraFallback({ onReady }: Props) {
         playsInline
         muted
         onPlaying={() => {
+          if (watchdogRef.current !== null) {
+            window.clearTimeout(watchdogRef.current);
+            watchdogRef.current = null;
+          }
           setIsReady(true);
           onReady?.();
         }}

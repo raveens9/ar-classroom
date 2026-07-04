@@ -30,24 +30,18 @@ TEXTURES_DIR.mkdir(parents=True, exist_ok=True)
 # Paths are relative to the web app's /public root (apps/web/public/<path>).
 # Animated assets are preferred so users see motion in AR.
 MODEL_REGISTRY: dict[str, str] = {
-    # Animated animals — these are what we actually have.
-    "cat": "an_animated_cat.glb",
-    "dog": "dog/source/dog.glb",
-    # Classifier can also return these labels; map them to animated fallbacks
-    # so testing produces a visible result every time.
-    "dragon": "dog/source/dog.glb",
-    "dinosaur": "dog/source/dog.glb",
-    "robot": "an_animated_cat.glb",
-    "bird": "an_animated_cat.glb",
-    "fish": "an_animated_cat.glb",
+    "cat":      "Animals/cat/cat.glb",
+    "dog":      "Animals/dog/dog.glb",
+    "dragon":   "Animals/dog/dog.glb",
+    "dinosaur": "Animals/dinosaur/dinosaur.glb",
+    "robot":    "Animals/cat/cat.glb",
+    "bird":     "Animals/cat/cat.glb",
+    "fish":     "Animals/fish/fish.glb",
     # Non-animal labels → fall through to a letter (picked randomly at request time).
     # Handled below in resolve_model_path().
 }
 
-LETTERS: list[str] = (
-    ["Letter_A.glb", "Letter_B.glb", "Letter_C.glb"]
-    + [f"{c}.glb" for c in "DEFGHIJKLMNOPQRSTUVWXYZ"]
-)
+LETTERS: list[str] = [f"Alphabet/{c}.glb" for c in "ABCDEFGHIJKLMNOPQRSTUVWXYZ"]
 
 
 def resolve_model_path(label: str) -> str:
