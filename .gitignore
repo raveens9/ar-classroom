@@ -25,7 +25,7 @@ apps/web/public/Home/
 
 # TypeScript incremental build cache
 apps/web/tsconfig.tsbuildinfo
-
+apps/style-transfer/src/style_transfer/neural/__pycache__
 apps/ml-api/app/models
 apps/style-transfer/backend/__pycache__
 apps/style-transfer/backend/routes/__pycache__

@@ -19,6 +19,8 @@
     "dev": "npm run build:shared && concurrently -n web,realtime -c cyan,magenta \"npm run dev:web\" \"npm run dev:realtime\"",
     "dev:full": "npm run build:shared && concurrently -n web,realtime,ml -c cyan,magenta,yellow \"npm run dev:web\" \"npm run dev:realtime\" \"npm run dev:ml\"",
     "build": "npm run build -ws --if-present",
+    "build:backend": "npm run build:shared && npm run build -w @ar/realtime",
+    "start:backend": "concurrently -n realtime,ml -c magenta,yellow \"npm run start -w @ar/realtime\" \"cd apps/ml-api && .venv/bin/python -m uvicorn main:app --host 0.0.0.0 --port 8000\"",
     "typecheck": "npm run build:shared && npm run typecheck -ws --if-present"
   },
   "devDependencies": {

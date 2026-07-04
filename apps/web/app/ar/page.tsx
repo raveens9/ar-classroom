@@ -20,10 +20,10 @@ export default function ARPage() {
   const [roomId, setRoomId] = useState<string>(roomParam);
   const [studentId, setStudentId] = useState<string>("");
 
-  // Server is the single source of truth — ar:new keeps this up to date for everyone.
   const [manifests, setManifests] = useState<ARManifest[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [ready, setReady] = useState(false);
+  const [ready, setReady] = useState(false);         // socket subscription ready
+  const [studentReady, setStudentReady] = useState(false); // student clicked "I'm Ready"
 
   const [stylePickerOpen, setStylePickerOpen] = useState(false);
   const [styling, setStyling] = useState(false);
@@ -46,10 +46,9 @@ export default function ARPage() {
       if (m.roomId !== roomId) return;
       setManifests((prev) => [...prev.filter((x) => x.authorId !== m.authorId), m]);
     };
-
     const onReconnect = () => {
-      // Server restarted — rooms are gone. Reset so the subscribe re-runs.
       setReady(false);
+      setStudentReady(false);
       setManifests([]);
     };
 
@@ -77,8 +76,6 @@ export default function ARPage() {
     setStylePickerOpen(false);
     setStyleError(null);
     try {
-      // Apply the chosen style to every model in the room sequentially.
-      // The server broadcasts ar:new for each, so all students see every update.
       for (const manifest of manifests) {
         const styledUrl = await mlStylize({
           modelUrl: manifest.modelUrl,
@@ -98,6 +95,12 @@ export default function ARPage() {
     }
   }
 
+  async function handleReady() {
+    setStudentReady(true);
+    // Best-effort — don't block if the emit fails
+    emitAck("ar:student-ready", { roomId, studentId }).catch(() => {});
+  }
+
   // ── Render states ──────────────────────────────────────────────────────────
 
   if (!roomId) {
@@ -115,9 +118,7 @@ export default function ARPage() {
           <h1 className="text-lg font-semibold">AR View</h1>
           <p className="text-sm text-white/70">Enter your room to load AR models.</p>
           <input name="room" className="w-full bg-white/10 rounded px-3 py-2" placeholder="room id" />
-          <button className="btn-primary w-full" type="submit">
-            Continue
-          </button>
+          <button className="btn-primary w-full" type="submit">Continue</button>
         </form>
       </main>
     );
@@ -152,44 +153,67 @@ export default function ARPage() {
     );
   }
 
+  // Pre-AR staging screen — student styles their model and signals ready before entering AR.
+  if (!studentReady) {
+    return (
+      <main className="min-h-screen flex items-center justify-center p-6">
+        <div className="card max-w-sm w-full space-y-5">
+          <div>
+            <h2 className="text-lg font-semibold">
+              {manifests.length} model{manifests.length === 1 ? "" : "s"} ready
+            </h2>
+            <p className="text-sm text-white/60 mt-1">
+              Optionally apply a style, then open the AR view when you&apos;re ready.
+            </p>
+          </div>
+
+          {/* Style section */}
+          <div className="space-y-2">
+            <button
+              onClick={() => setStylePickerOpen(true)}
+              disabled={styling}
+              className="btn-ghost w-full flex items-center justify-center gap-2"
+            >
+              {styling ? (
+                <>
+                  <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+                  Applying style…
+                </>
+              ) : (
+                "Apply Style"
+              )}
+            </button>
+            {styleError && (
+              <p className="text-xs text-red-300">{styleError}</p>
+            )}
+          </div>
+
+          {/* Ready button — disabled while style transfer is running */}
+          <button
+            className="btn-primary w-full"
+            disabled={styling}
+            onClick={handleReady}
+          >
+            {styling ? "Please wait…" : "Open AR View"}
+          </button>
+        </div>
+
+        {/* Style picker slides up over the staging screen */}
+        {stylePickerOpen && (
+          <StylePicker
+            loading={styling}
+            onSelect={applyStyle}
+            onClose={() => setStylePickerOpen(false)}
+          />
+        )}
+      </main>
+    );
+  }
+
+  // Student is ready — show the full AR viewer.
   return (
     <div className="relative h-screen w-screen overflow-hidden">
       <ARViewer manifests={manifests} />
-
-      {/* Style button — visible to any student once models are in the room */}
-      <button
-          onClick={() => setStylePickerOpen(true)}
-          disabled={styling}
-          className="absolute bottom-6 right-4 z-30 flex items-center gap-2 rounded-full bg-black/60 px-4 py-2 text-sm font-medium text-white shadow-lg backdrop-blur-sm transition hover:bg-black/80 active:scale-95 disabled:opacity-50"
-        >
-          {styling ? (
-            <>
-              <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
-              Styling…
-            </>
-          ) : (
-            <>🎨 Style</>
-          )}
-        </button>
-
-      {/* Error toast */}
-      {styleError && (
-        <div className="absolute bottom-20 left-1/2 z-30 -translate-x-1/2 rounded-lg bg-red-900/80 px-4 py-2 text-xs text-red-200 backdrop-blur-sm">
-          {styleError}
-          <button onClick={() => setStyleError(null)} className="ml-3 opacity-60 hover:opacity-100">
-            ✕
-          </button>
-        </div>
-      )}
-
-      {/* Style picker overlay */}
-      {stylePickerOpen && (
-        <StylePicker
-          loading={styling}
-          onSelect={applyStyle}
-          onClose={() => setStylePickerOpen(false)}
-        />
-      )}
     </div>
   );
 }

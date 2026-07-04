@@ -36,6 +36,7 @@ export interface ClientToServerEvents {
   "ar:publish": (p: ARPublishPayload, ack: (r: Ack<ARManifest>) => void) => void;
   "ar:subscribe": (p: SubscribeARPayload, ack: (r: Ack<ARRoomFeed>) => void) => void;
   "ar:restyle": (p: ARRestylePayload, ack: (r: Ack<ARManifest>) => void) => void;
+  "ar:student-ready": (p: { roomId: string; studentId: string }, ack: (r: Ack<{ ok: true }>) => void) => void;
 }
 
 // Events: server -> client
@@ -48,6 +49,7 @@ export interface ServerToClientEvents {
   "canvas:undo": (ev: CanvasUndo) => void;
   "ar:new": (manifest: ARManifest & { roomId: string }) => void;
   "ar:feed": (feed: ARRoomFeed) => void;
+  "ar:student-ready": (p: { roomId: string; studentId: string }) => void;
   "system:error": (payload: { code: string; message: string }) => void;
 }
 
