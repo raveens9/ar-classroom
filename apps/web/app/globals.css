@@ -39,3 +39,57 @@ canvas {
 .card {
   @apply rounded-lg border border-white/10 bg-white/5 p-4;
 }
+
+/* ── Kid theme (ages 2–5) ─────────────────────────────────────────────────
+   Used only on kid-facing pages (/student, /join, /ar). "Sticker" buttons:
+   thick ink outline + hard offset shadow that squashes on press, so every
+   tap gives physical feedback even with sound off. Adult pages keep the
+   dark theme and btn-* utilities above. */
+
+@layer components {
+  .kid-page {
+    @apply min-h-screen bg-kid-paper font-kid text-kid-ink;
+  }
+
+  .kid-btn {
+    @apply relative inline-flex min-h-[64px] select-none items-center justify-center gap-2 rounded-full border-[3px] border-kid-ink bg-white px-8 font-kid text-xl font-semibold text-kid-ink;
+    box-shadow: 0 5px 0 theme("colors.kid.ink");
+    transition: transform 100ms ease, box-shadow 100ms ease;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .kid-btn:active:not(:disabled) {
+    transform: translateY(4px);
+    box-shadow: 0 1px 0 theme("colors.kid.ink");
+  }
+  .kid-btn:disabled {
+    @apply opacity-40;
+  }
+
+  .kid-btn-icon {
+    @apply relative inline-flex h-16 w-16 select-none items-center justify-center rounded-full border-[3px] border-kid-ink bg-white p-0 font-kid text-3xl leading-none text-kid-ink;
+    box-shadow: 0 5px 0 theme("colors.kid.ink");
+    transition: transform 100ms ease, box-shadow 100ms ease;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .kid-btn-icon:active:not(:disabled) {
+    transform: translateY(4px);
+    box-shadow: 0 1px 0 theme("colors.kid.ink");
+  }
+  .kid-btn-icon:disabled {
+    @apply opacity-40;
+  }
+
+  .kid-card {
+    @apply rounded-3xl border-[3px] border-kid-ink bg-white p-5;
+    box-shadow: 0 6px 0 rgba(51, 50, 92, 0.15);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .kid-btn,
+  .kid-btn-icon {
+    transition: none;
+  }
+}

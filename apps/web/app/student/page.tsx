@@ -3,11 +3,25 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { CollabCanvas, type CanvasHandle } from "@/components/Canvas";
 import { emitAck, getSocket } from "@/lib/socket";
+import { KidButton } from "@/components/kid/KidButton";
+import { KidStatusScreen } from "@/components/kid/KidStatusScreen";
+import { SoundToggle } from "@/components/kid/SoundToggle";
+import { ConfettiBurst } from "@/components/kid/ConfettiBurst";
+import { HoldButton } from "@/components/kid/HoldButton";
+import { playPick, playTap, playYay } from "@/lib/kidSounds";
 import type { ARManifest, ARRoomFeed, Room, StudentPresence } from "@ar/shared";
 
+// White removed (invisible on the paper canvas); pink + near-black ink added.
 const PALETTE = [
-  "#ef4444", "#f97316", "#fbbf24", "#22c55e",
-  "#3b82f6", "#a855f7", "#1a1a1a", "#ffffff",
+  "#ef4444", "#f97316", "#FFC53D", "#3FBF63",
+  "#3b82f6", "#8B5CF6", "#F472B6", "#23233B",
+];
+
+// Three chunky presets instead of a slider — dot is the preview circle size.
+const BRUSH_SIZES = [
+  { value: 5, dot: 8 },
+  { value: 12, dot: 16 },
+  { value: 24, dot: 28 },
 ];
 
 const SESSION_KEY = "ar-student-session";
@@ -27,12 +41,14 @@ export default function StudentPage() {
   const [roomId, setRoomId] = useState<string>("");
   const [room, setRoom] = useState<Room | null>(null);
   const [color, setColor] = useState("#3b82f6");
-  const [size, setSize] = useState(6);
+  const [size, setSize] = useState(12);
   const [tool, setTool] = useState<"pen" | "eraser">("pen");
   const [arManifests, setArManifests] = useState<ARManifest[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [sessionReady, setSessionReady] = useState(false);
   const [waitingForRoom, setWaitingForRoom] = useState(false);
+  const [celebrate, setCelebrate] = useState(false);
+  const arSeenRef = useRef(false);
   const canvasRef = useRef<CanvasHandle>(null);
 
   const join = async (overrideRoomId?: string, overrideIdent?: { id: string; name: string }) => {
@@ -181,6 +197,21 @@ export default function StudentPage() {
   const canDraw = !!(room && me?.state === "ADMITTED" && room.mode === "OPEN");
   const arAvailable = arManifests.length > 0;
 
+  // Celebrate the moment AR models first arrive: sound + confetti + the AR
+  // button popping in. Absence→arrival is far more noticeable to a toddler
+  // than a greyed-out button turning colored.
+  useEffect(() => {
+    if (arAvailable && !arSeenRef.current) {
+      arSeenRef.current = true;
+      setCelebrate(true);
+      playYay();
+      const t = setTimeout(() => setCelebrate(false), 2600);
+      return () => clearTimeout(t);
+    }
+    if (!arAvailable) arSeenRef.current = false;
+    return undefined;
+  }, [arAvailable]);
+
   const leaveRoom = () => {
     localStorage.removeItem(SESSION_KEY);
     setIdent(null);
@@ -191,114 +222,61 @@ export default function StudentPage() {
   };
 
   if (!sessionReady) {
-    return (
-      <main className="min-h-screen flex items-center justify-center bg-[#0b0b12]">
-        <p className="text-white/40">Connecting…</p>
-      </main>
-    );
+    return <KidStatusScreen visual="🖍️" caption="Connecting…" />;
   }
 
   if (!ident) {
     return (
-      <main className="min-h-screen flex flex-col items-center justify-center bg-[#0b0b12] gap-4 p-6 text-center">
-        <div className="text-6xl">📷</div>
-        <h1 className="text-2xl font-semibold text-white">Scan the classroom QR code</h1>
-        <p className="text-white/50 max-w-xs">
-          Ask your aide to scan the QR code in your classroom to get started.
-        </p>
-      </main>
+      <KidStatusScreen
+        visual="📷"
+        title="Scan the classroom QR code"
+        caption="Ask your aide to scan the QR code in your classroom to get started."
+        bounce={false}
+      />
     );
   }
 
   if (waitingForRoom && !room) {
     return (
-      <main className="min-h-screen flex flex-col items-center justify-center bg-[#0b0b12] gap-4 p-6 text-center">
-        <div className="w-8 h-8 border-2 border-white/20 border-t-white rounded-full animate-spin" />
-        <h1 className="text-xl font-semibold text-white">Hi, {ident.name}!</h1>
-        <p className="text-white/50">Waiting for your teacher to open the room…</p>
-        <button onClick={leaveRoom} className="text-sm text-white/30 hover:text-white/60 transition-colors mt-2">
+      <KidStatusScreen
+        visual="⏳"
+        title={`Hi, ${ident.name}!`}
+        caption="Waiting for your teacher to open the room…"
+      >
+        <button
+          onClick={leaveRoom}
+          className="mt-2 text-sm text-kid-ink/40 transition-colors hover:text-kid-ink/70"
+        >
           ← Go back
         </button>
-      </main>
+      </KidStatusScreen>
     );
   }
 
   return (
-    <main className="min-h-screen p-4 md:p-8 flex flex-col gap-4">
-      <header className="flex items-center justify-between flex-wrap gap-3">
-        <div className="flex items-center gap-3">
-          <h1 className="text-xl font-semibold">Hi, {ident.name}!</h1>
-          <button
-            onClick={leaveRoom}
-            className="text-xs text-white/30 hover:text-white/60 transition-colors"
-            title="Leave room and return to QR scan screen"
-          >
-            Leave
-          </button>
+    <main className="kid-page flex flex-col gap-3 p-3 sm:p-5">
+      <header className="flex items-center justify-between gap-3">
+        <div className="kid-card flex items-center gap-2 !p-2 px-4 text-xl font-bold">
+          <span role="img" aria-hidden="true">👋</span> {ident.name}
         </div>
-
-        <div className="flex items-center gap-3 flex-wrap">
-          <div className="flex items-center gap-1">
-            {PALETTE.map((c) => (
-              <button
-                key={c}
-                onClick={() => { setColor(c); setTool("pen"); }}
-                title={c}
-                className="w-7 h-7 rounded-full border-2 transition-transform hover:scale-110 focus:outline-none"
-                style={{
-                  backgroundColor: c,
-                  borderColor: color === c && tool === "pen" ? "#fff" : "transparent",
-                  transform: color === c && tool === "pen" ? "scale(1.2)" : undefined,
-                }}
-              />
-            ))}
-            <input
-              type="color"
-              value={color}
-              onChange={(e) => { setColor(e.target.value); setTool("pen"); }}
-              className="w-7 h-7 rounded cursor-pointer border-0 p-0 bg-transparent"
-              title="Custom colour"
-            />
-          </div>
-
-          <label className="flex items-center gap-2 text-sm">
-            <span>Size</span>
-            <input type="range" min={2} max={28} value={size} onChange={(e) => setSize(Number(e.target.value))} />
-          </label>
-
-          <div className="flex gap-1">
-            <button className={tool === "pen" ? "btn-primary" : "btn-ghost"} onClick={() => setTool("pen")}>Pen</button>
-            <button className={tool === "eraser" ? "btn-primary" : "btn-ghost"} onClick={() => setTool("eraser")}>Eraser</button>
-          </div>
-
-          <div className="flex gap-1">
-            <button className="btn-ghost" onClick={() => canvasRef.current?.undo()}>Undo</button>
-            <button className="btn-ghost" onClick={() => canvasRef.current?.redo()}>Redo</button>
-          </div>
-
-          {arAvailable ? (
-            <a href={`/ar?room=${roomId}&id=${ident.id}`} className="btn-primary">Open AR view</a>
-          ) : (
-            <span className="btn-ghost opacity-50 cursor-not-allowed select-none" title="Waiting for teacher to publish AR models">
-              Open AR view
-            </span>
-          )}
+        <div className="flex items-center gap-2">
+          <SoundToggle />
+          <HoldButton onComplete={leaveRoom} title="Hold to leave the room" aria-label="Hold to leave the room">
+            🚪
+          </HoldButton>
         </div>
       </header>
 
-      {error && <div className="card border-red-500/40 text-red-300 text-sm">{error}</div>}
-
-      {room && (
-        <div className="text-xs text-white/30 -mt-2">
-          Room {room.roomId} · {room.mode} ·{" "}
-          <span className={me?.state === "ADMITTED" ? "text-green-400" : me?.state === "REMOVED" ? "text-red-400" : "text-yellow-400"}>
-            {me?.state ?? "joining…"}
-          </span>
+      {error && (
+        <div className="kid-card flex items-center gap-3 border-kid-coral text-base">
+          <span className="text-2xl" role="img" aria-hidden="true">❗</span>
+          <span>{error}</span>
         </div>
       )}
 
-      <div className="flex-1 min-h-[60vh]">
-        {ident && room && (
+      {/* Canvas = white paper. AR button floats over it when models arrive. */}
+      <div className="relative min-h-[52vh] flex-1">
+        {room ? (
           <CollabCanvas
             ref={canvasRef}
             roomId={room.roomId}
@@ -307,25 +285,119 @@ export default function StudentPage() {
             tool={tool}
             color={color}
             size={size}
-            className="w-full h-[70vh] bg-black/40 rounded-md"
+            className="h-full min-h-[52vh] w-full rounded-3xl border-[3px] border-kid-ink bg-white"
           />
-        )}
-        {!room && (
-          <div className="h-[70vh] flex items-center justify-center text-white/40 text-sm">
-            Connecting to room…
+        ) : (
+          <div className="flex h-full min-h-[52vh] flex-col items-center justify-center gap-3 rounded-3xl border-[3px] border-dashed border-kid-ink/30">
+            <div className="animate-kid-bounce text-6xl motion-reduce:animate-none" role="img" aria-hidden="true">🖍️</div>
+            <p className="text-kid-ink/50">Connecting to room…</p>
           </div>
+        )}
+
+        {room && !canDraw && (
+          <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 rounded-3xl bg-kid-paper/90 p-6 text-center">
+            {me?.state === "WAITING" ? (
+              <>
+                <div className="animate-kid-bounce text-7xl motion-reduce:animate-none" role="img" aria-hidden="true">⏳</div>
+                <p className="text-2xl font-bold">Almost time!</p>
+                <p className="text-kid-ink/60">Your teacher will let you in soon.</p>
+              </>
+            ) : me?.state === "REMOVED" ? (
+              <>
+                <div className="text-7xl" role="img" aria-hidden="true">🙋</div>
+                <p className="text-2xl font-bold">Hand me to a grown-up</p>
+                <p className="text-kid-ink/60">You&apos;ve been removed from the room.</p>
+              </>
+            ) : (
+              <>
+                <div className="text-7xl" role="img" aria-hidden="true">😴</div>
+                <p className="text-2xl font-bold">Drawing is asleep</p>
+                <p className="text-kid-ink/60">Your teacher paused drawing for now.</p>
+              </>
+            )}
+          </div>
+        )}
+
+        {room && arAvailable && (
+          <a
+            href={`/ar?room=${roomId}&id=${ident.id}`}
+            onClick={() => playTap()}
+            className="absolute right-3 top-3 z-20 block animate-kid-pop-in"
+            aria-label="See your drawing in AR"
+          >
+            <span className="absolute inset-0 rounded-full bg-kid-sun animate-kid-pulse-ring motion-reduce:animate-none" aria-hidden="true" />
+            <span className="kid-btn-icon relative h-20 w-20 bg-kid-sun text-4xl">✨</span>
+          </a>
         )}
       </div>
 
-      {room && !canDraw && (
-        <div className="card text-sm text-white/70">
-          {me?.state === "WAITING"
-            ? "Waiting for your teacher to admit you…"
-            : me?.state === "REMOVED"
-            ? "You've been removed from the room."
-            : "Room is closed for drawing."}
+      {/* Toolbar: chunky color dots, three brush sizes, eraser, one undo. */}
+      {room && (
+        <div className="kid-card flex flex-col items-center gap-3 !p-3">
+          <div className="flex flex-wrap justify-center gap-2.5">
+            {PALETTE.map((c) => {
+              const active = color === c && tool === "pen";
+              return (
+                <button
+                  key={c}
+                  onClick={() => { setColor(c); setTool("pen"); playPick(); }}
+                  aria-label={`Draw with ${c}`}
+                  aria-pressed={active}
+                  className={`h-[52px] w-[52px] rounded-full border-[3px] transition-transform motion-reduce:transition-none ${
+                    active
+                      ? "scale-110 border-kid-ink ring-4 ring-kid-sun"
+                      : "border-kid-ink/20 active:scale-95"
+                  }`}
+                  style={{ backgroundColor: c }}
+                />
+              );
+            })}
+          </div>
+
+          <div className="flex flex-wrap items-center justify-center gap-2.5">
+            {BRUSH_SIZES.map((s) => {
+              const active = size === s.value;
+              return (
+                <button
+                  key={s.value}
+                  onClick={() => { setSize(s.value); playPick(); }}
+                  aria-label={`Brush size ${s.value}`}
+                  aria-pressed={active}
+                  className={`flex h-[52px] w-[52px] items-center justify-center rounded-full border-[3px] transition-transform motion-reduce:transition-none ${
+                    active ? "border-kid-ink bg-kid-sun" : "border-kid-ink/20 bg-white active:scale-95"
+                  }`}
+                >
+                  <span
+                    className="rounded-full"
+                    style={{
+                      width: s.dot,
+                      height: s.dot,
+                      backgroundColor: tool === "eraser" ? "#B8B4D6" : color,
+                    }}
+                  />
+                </button>
+              );
+            })}
+
+            <div className="h-10 w-[3px] rounded-full bg-kid-ink/10" aria-hidden="true" />
+
+            <KidButton
+              icon
+              aria-label="Eraser"
+              aria-pressed={tool === "eraser"}
+              className={tool === "eraser" ? "!bg-kid-sky" : ""}
+              onClick={() => setTool((t) => (t === "eraser" ? "pen" : "eraser"))}
+            >
+              🧽
+            </KidButton>
+            <KidButton icon aria-label="Undo" onClick={() => canvasRef.current?.undo()}>
+              ↩️
+            </KidButton>
+          </div>
         </div>
       )}
+
+      {celebrate && <ConfettiBurst />}
     </main>
   );
 }

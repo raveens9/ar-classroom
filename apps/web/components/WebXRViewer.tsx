@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
+import { playYay } from "@/lib/kidSounds";
 import type { ARManifest } from "@ar/shared";
 
 interface Props {
@@ -61,7 +62,7 @@ export function WebXRViewer({ session, manifests, onEnd }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   // placedRef is a ref so the XR animation loop closure always sees the latest value.
   const placedRef = useRef(false);
-  const [hint, setHint] = useState("Loading models…");
+  const [hint, setHint] = useState("⏳ Loading models…");
 
   useEffect(() => {
     const container = containerRef.current;
@@ -137,7 +138,8 @@ export function WebXRViewer({ session, manifests, onEnd }: Props) {
 
       placedRef.current = true;
       reticle.visible = false;
-      setHint("Models placed");
+      playYay();
+      setHint("🎉 There they are!");
     };
 
     // XR setup: reference space type must be set before setSession.
@@ -158,10 +160,10 @@ export function WebXRViewer({ session, manifests, onEnd }: Props) {
       // Pre-load all models while the user scans for a surface.
       try {
         preloaded = await Promise.all(manifests.map(m => loadGLB(m.modelUrl)));
-        setHint(hitTestSource ? "Point at a surface, then tap to place" : "Tap to place models");
+        setHint(hitTestSource ? "👆 Point at the floor, then tap!" : "👆 Tap to place your models");
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err);
-        setHint(`Failed to load model: ${msg}`);
+        setHint(`❗ Failed to load model: ${msg}`);
       }
     });
 
@@ -225,15 +227,18 @@ export function WebXRViewer({ session, manifests, onEnd }: Props) {
         className="absolute inset-x-0 bottom-8 flex justify-center pointer-events-none"
         style={{ zIndex: 20 }}
       >
-        <p className="text-white text-sm bg-black/60 px-4 py-2 rounded-full">{hint}</p>
+        <p className="rounded-full border-[3px] border-kid-ink bg-white/95 px-6 py-3 font-kid text-lg font-semibold text-kid-ink">
+          {hint}
+        </p>
       </div>
 
       <div className="absolute top-3 right-3" style={{ zIndex: 20 }}>
         <button
-          className="btn-ghost"
+          className="kid-btn-icon bg-white text-2xl"
           onClick={() => session.end().catch(() => onEnd())}
+          aria-label="Close AR view"
         >
-          Close
+          ✕
         </button>
       </div>
     </div>

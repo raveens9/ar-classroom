@@ -16,11 +16,12 @@
     "dev:web": "npm run dev -w @ar/web",
     "dev:realtime": "npm run dev -w @ar/realtime",
     "dev:ml": "cd apps/ml-api && python -m uvicorn main:app --host 0.0.0.0 --port 8000 --reload --ssl-keyfile ../../certs/dev-key.pem --ssl-certfile ../../certs/dev-cert.pem",
+    "dev:st": "cd apps/style-transfer && .venv/bin/python -m uvicorn backend.app:app --host 0.0.0.0 --port 8001 --reload",
     "dev": "npm run build:shared && concurrently -n web,realtime -c cyan,magenta \"npm run dev:web\" \"npm run dev:realtime\"",
-    "dev:full": "npm run build:shared && concurrently -n web,realtime,ml -c cyan,magenta,yellow \"npm run dev:web\" \"npm run dev:realtime\" \"npm run dev:ml\"",
+    "dev:full": "npm run build:shared && concurrently -n web,realtime,ml,st -c cyan,magenta,yellow,blue \"npm run dev:web\" \"npm run dev:realtime\" \"npm run dev:ml\" \"npm run dev:st\"",
     "build": "npm run build -ws --if-present",
     "build:backend": "npm run build:shared && npm run build -w @ar/realtime",
-    "start:backend": "concurrently -n realtime,ml -c magenta,yellow \"npm run start -w @ar/realtime\" \"cd apps/ml-api && .venv/bin/python -m uvicorn main:app --host 0.0.0.0 --port 8000\"",
+    "start:backend": "concurrently -n realtime,ml,st -c magenta,yellow,blue \"npm run start -w @ar/realtime\" \"cd apps/ml-api && .venv/bin/python -m uvicorn main:app --host 0.0.0.0 --port 8000\" \"cd apps/style-transfer && .venv/bin/python -m uvicorn backend.app:app --host 0.0.0.0 --port 8001\"",
     "typecheck": "npm run build:shared && npm run typecheck -ws --if-present"
   },
   "devDependencies": {
