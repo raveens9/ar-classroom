@@ -10,6 +10,7 @@ pointing at that origin so assets don't have to be duplicated.
 """
 from __future__ import annotations
 
+import os
 import random
 import uuid
 from pathlib import Path
@@ -30,14 +31,22 @@ TEXTURES_DIR.mkdir(parents=True, exist_ok=True)
 # Paths are relative to the web app's /public root (apps/web/public/<path>).
 # Animated assets are preferred so users see motion in AR.
 MODEL_REGISTRY: dict[str, str] = {
+    "butterfly": "Animals/butterfly/animated_flying_fluttering_butterfly_loop.glb",
     "cat":      "Animals/cat/cat.glb",
     "dog":      "Animals/dog/dog.glb",
     "dragon":   "Animals/dog/dog.glb",
     "dinosaur": "Animals/dinosaur/dinosaur.glb",
     "robot":    "Animals/cat/cat.glb",
-    "bird":     "Animals/cat/cat.glb",
+    "bird":     "Animals/butterfly/animated_flying_fluttering_butterfly_loop.glb",
     "fish":     "Animals/fish/fish.glb",
-    # Non-animal labels → fall through to a letter (picked randomly at request time).
+    # Nature labels
+    "cloud":    "Nature/cloud_animation.glb",
+    "flower":   "Nature/blue_flower_animated.glb",
+    "rain":     "Nature/rain_2.glb",
+    "rainbow":  "Nature/rainbow.glb",
+    "sun":      "Nature/cloud__sun_lowpoly.glb",
+    "tree":     "Nature/tree_animate.glb",
+    # Non-animal/nature labels → fall through to a letter (picked randomly at request time).
     # Handled below in resolve_model_path().
 }
 
@@ -60,13 +69,21 @@ class PrepareBody(BaseModel):
     animationName: Optional[str] = None
 
 
+def _localise_cutout_url(url: str) -> str:
+    public_base = os.getenv("MODEL_ASSET_BASE_URL", "").rstrip("/")
+    if public_base and url.startswith(public_base):
+        port = os.getenv("ML_API_PORT", "8000")
+        return "http://localhost:" + port + "/static" + url[len(public_base):]
+    return url
+
+
 async def _mirror_cutout_as_texture(cutout_url: str) -> str:
     """Download the cutout and store as a texture file. Returns texture URL."""
     tex_id = uuid.uuid4().hex
     tex_path = TEXTURES_DIR / f"{tex_id}.png"
     try:
         async with httpx.AsyncClient(verify=False, timeout=10.0) as client:
-            r = await client.get(cutout_url)
+            r = await client.get(_localise_cutout_url(cutout_url))
             r.raise_for_status()
             tex_path.write_bytes(r.content)
     except Exception as e:

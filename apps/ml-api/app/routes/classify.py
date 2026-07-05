@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import io
 import logging
+import os
 from pathlib import Path
 from typing import Optional
 
@@ -111,9 +112,17 @@ async def classify(body: ClassifyBody):
     class_names: list[str] = cfg["classes"]
     anim_map: dict[str, str] = cfg["anim"]
 
+    # Rewrite public tunnel URL → localhost so the ml-api doesn't round-trip
+    # through Cloudflare to fetch its own static files.
+    cutout_url = body.cutoutUrl
+    public_base = os.getenv("MODEL_ASSET_BASE_URL", "").rstrip("/")
+    if public_base and cutout_url.startswith(public_base):
+        port = os.getenv("ML_API_PORT", "8000")
+        cutout_url = "http://localhost:" + port + "/static" + cutout_url[len(public_base):]
+
     try:
         async with httpx.AsyncClient(verify=False, timeout=15.0) as client:
-            resp = await client.get(body.cutoutUrl)
+            resp = await client.get(cutout_url)
             resp.raise_for_status()
             img_bytes = resp.content
     except Exception as exc:

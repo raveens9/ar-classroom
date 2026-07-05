@@ -156,8 +156,13 @@ export function WebXRViewer({ session, manifests, onEnd }: Props) {
       }
 
       // Pre-load all models while the user scans for a surface.
-      preloaded = await Promise.all(manifests.map(m => loadGLB(m.modelUrl)));
-      setHint(hitTestSource ? "Point at a surface, then tap to place" : "Tap to place models");
+      try {
+        preloaded = await Promise.all(manifests.map(m => loadGLB(m.modelUrl)));
+        setHint(hitTestSource ? "Point at a surface, then tap to place" : "Tap to place models");
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        setHint(`Failed to load model: ${msg}`);
+      }
     });
 
     const onSelect = () => {
