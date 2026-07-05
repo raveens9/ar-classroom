@@ -2,7 +2,7 @@
 
 Runs the student's cutout through the correct QuickDraw CNN based on the room topic:
   - topic="animals"  → image_classifier_fyp.keras    (butterfly, cat, dog, fish)
-  - topic="nature"   → image_classifier_nature.keras  (cloud, flower, rain, rainbow, sun, tree)
+  - topic="nature"   → image_classifier_nature_colored.keras  (cloud, flower, rain, rainbow, sun, tree)
 """
 from __future__ import annotations
 
@@ -29,7 +29,7 @@ TOPIC_CONFIG: dict[str, dict] = {
         "anim": {"butterfly": "fly", "cat": "walk", "dog": "run", "fish": "swim"},
     },
     "nature": {
-        "path": _MODELS_DIR / "image_classifier_nature.keras",
+        "path": _MODELS_DIR / "image_classifier_nature_colored.keras",
         "classes": ["cloud", "flower", "rain", "rainbow", "sun", "tree"],
         "anim": {"cloud": "idle", "flower": "idle", "rain": "idle", "rainbow": "idle", "sun": "idle", "tree": "idle"},
     },
@@ -81,6 +81,27 @@ def _preprocess(img_bytes: bytes) -> np.ndarray:
     c0 = max(0, cols[0] - pad)
     c1 = min(w, cols[-1] + pad + 1)
     ink_crop = ink_mask[r0:r1, c0:c1]
+
+    # If the drawing is heavily filled (coloured regions, not just outlines),
+    # extract the outline so it matches QuickDraw's line-art training style.
+    # A filled orange flower at 28x28 looks like a solid blob — the outline
+    # looks like a flower. Threshold >35% fill = treat as filled drawing.
+    ink_ratio = ink_crop.mean()
+    log.info("ink fill ratio=%.2f", ink_ratio)
+    if ink_ratio > 0.35:
+        from scipy.ndimage import binary_erosion, binary_closing
+        bbox_size = max(ink_crop.shape)
+        # Step 1: close internal gaps (scribble lines inside a fill leave dark holes
+        # that create noisy patterns at 28x28 — closing fills them into a clean solid shape)
+        close_depth = max(5, bbox_size // 20)
+        cleaned = binary_closing(ink_crop, iterations=close_depth)
+        # Step 2: extract outline from the clean solid shape
+        erosion_depth = max(3, bbox_size // 12)
+        eroded = binary_erosion(cleaned, iterations=erosion_depth)
+        outline = cleaned & ~eroded
+        if outline.any():
+            ink_crop = outline
+            log.info("filled drawing — closed+outlined (close=%d erode=%d)", close_depth, erosion_depth)
 
     binary = (ink_crop * 255).astype("uint8")
     resized = Image.fromarray(binary).resize((28, 28), Image.LANCZOS)
