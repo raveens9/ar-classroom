@@ -66,6 +66,16 @@ export function registerARHandlers(io: Server, socket: Socket): void {
     ack({ ok: true, data: updated });
   });
 
+  socket.on("ar:student-ready", (raw, ack: (r: Ack<{ ok: true }>) => void) => {
+    const { roomId, studentId } = (raw ?? {}) as { roomId?: string; studentId?: string };
+    if (!roomId || !studentId)
+      return ack({ ok: false, code: "BAD_REQUEST", message: "roomId and studentId required" });
+    if (!socket.rooms.has(roomId))
+      return ack({ ok: false, code: "FORBIDDEN", message: "Not in room" });
+    io.to(roomId).emit("ar:student-ready", { roomId, studentId });
+    ack({ ok: true, data: { ok: true } });
+  });
+
   socket.on("ar:subscribe", (raw, ack: (r: Ack<ARRoomFeed>) => void) => {
     const parsed = SubscribeARPayloadSchema.safeParse(raw);
     if (!parsed.success) {

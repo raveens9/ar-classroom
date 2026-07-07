@@ -1,0 +1,24 @@
+# Cloudflare Tunnel config for local backend → public HTTPS.
+# Copy this to ~/.cloudflared/config.yml and fill in your values.
+#
+# Setup (one-time):
+#   brew install cloudflare/cloudflare/cloudflared
+#   cloudflared tunnel login             # opens browser, links your CF account
+#   cloudflared tunnel create ar-backend # creates tunnel, saves credentials JSON
+#   cloudflared tunnel route dns ar-backend realtime.yourdomain.com
+#   cloudflared tunnel route dns ar-backend ml.yourdomain.com
+#
+# Run (every session before class):
+#   npm run build:backend   # compile realtime TypeScript
+#   npm run start:backend   # start realtime + ml-api locally
+#   cloudflared tunnel run ar-backend
+
+tunnel: 9aa03376-829b-4955-980a-777fece5e00a
+credentials-file: /Users/raveenshenuka/.cloudflared/9aa03376-829b-4955-980a-777fece5e00a.json
+
+ingress:
+  - hostname: realtime.drearmer.com
+    service: http://localhost:4001
+  - hostname: ml.drearmer.com
+    service: http://localhost:8000
+  - service: http_status:404
