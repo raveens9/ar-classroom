@@ -16,8 +16,11 @@ import type { Room, RoomMode, Topic } from "@ar/shared";
 
 // Labels available in the prepare-texture model registry, grouped by topic.
 const TOPIC_LABELS: Record<string, string[]> = {
-  animals:  ["butterfly", "cat", "dog", "fish", "dragon", "dinosaur", "robot", "bird"],
-  nature:   ["cloud", "flower", "rain", "rainbow", "sun", "tree"],
+  animals:    ["butterfly", "cat", "dog", "fish"],
+  nature:     ["cloud", "flower", "rain", "rainbow", "sun", "tree"],
+  numbers:    ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"],
+  vegetables: ["carrot", "broccoli", "corn", "mushroom", "pumpkin"],
+  shapes:     ["circle", "square", "triangle", "rectangle", "heart", "diamond"],
 };
 
 const COLOR_PRESETS = ["#F472B6", "#5B5BD6", "#1C9C8B", "#E8A13C", "#D64550", "#2B2A33"];
@@ -48,20 +51,16 @@ export default function TeacherPage() {
   const [busy, setBusy] = useState(false);
   const canvasRef = useRef<CanvasHandle>(null);
 
-  // Pipeline state — each field is set as the corresponding step completes.
   const [prep, setPrep] = useState<{
     cutoutUrl?: string;
-    label?: string;       // predicted 3D model label from classifier
+    label?: string;
     confidence?: number;
     suggestedAnimation?: string;
     modelUrl?: string;
     textureUrl?: string;
   }>({});
 
-  // Teacher override: starts as the classifier's prediction; teacher can change it.
   const [selectedLabel, setSelectedLabel] = useState<string>("");
-
-  // Track which students have signalled AR-ready from the /ar page.
   const [arReadyStudents, setArReadyStudents] = useState<Set<string>>(new Set());
 
   useEffect(() => {
@@ -80,7 +79,6 @@ export default function TeacherPage() {
     return () => { socket.off("room:state", onRoom); };
   }, [room]);
 
-  // Listen for students signalling they are ready in the AR view.
   useEffect(() => {
     if (!room) return;
     const socket = getSocket();
@@ -92,7 +90,6 @@ export default function TeacherPage() {
     return () => { socket.off("ar:student-ready", onStudentReady); };
   }, [room]);
 
-  // Reset pipeline state whenever the teacher switches to a different student.
   useEffect(() => {
     setPrep({});
     setSelectedLabel("");
@@ -183,7 +180,6 @@ export default function TeacherPage() {
     return fn ? fn() : null;
   };
 
-  // Step 1: Remove background + classify. Sets cutoutUrl, predicted label, confidence.
   const doClassify = async () => {
     if (!watchedStudentId) return;
     const dataUrl = exportCanvas();
@@ -200,7 +196,6 @@ export default function TeacherPage() {
         label: c.label,
         confidence: c.confidence,
         suggestedAnimation: c.suggestedAnimation,
-        // Clear any previous prepare result so step 2 must re-run with new label.
         modelUrl: undefined,
         textureUrl: undefined,
       }));
@@ -213,7 +208,6 @@ export default function TeacherPage() {
     }
   };
 
-  // Step 2: Prepare model using the teacher's chosen label (override or classifier result).
   const doPrepare = async () => {
     if (!watchedStudentId || !prep.cutoutUrl || !selectedLabel) return;
     setBusy(true);
@@ -234,7 +228,6 @@ export default function TeacherPage() {
     }
   };
 
-  // Step 3: Approve and publish to all students via socket.
   const doApprove = async () => {
     if (!room || !watchedStudentId || !prep.modelUrl) return;
     setBusy(true);
@@ -296,7 +289,6 @@ export default function TeacherPage() {
 
   const availableLabels = TOPIC_LABELS[room?.topic ?? "animals"] ?? TOPIC_LABELS.animals;
   const watchedStudent = room?.students.find((s) => s.studentId === watchedStudentId);
-
   const step2Unlocked = Boolean(prep.cutoutUrl && prep.label);
   const step3Unlocked = Boolean(prep.modelUrl);
 
@@ -329,8 +321,11 @@ export default function TeacherPage() {
                   onChange={(e) => setTopic(e.target.value as Topic)}
                   className="flex-1 min-h-10 bg-white border border-[#DBD8CE] rounded-[10px] px-2 text-sm text-[#2B2A33]"
                 >
-                  <option value="animals">Animals</option>
-                  <option value="nature">Nature</option>
+                  <option value="animals">🐾 Animals</option>
+                  <option value="nature">🌿 Nature</option>
+                  <option value="numbers">🔢 Numbers</option>
+                  <option value="vegetables">🥕 Vegetables</option>
+                  <option value="shapes">🔷 Shapes</option>
                 </select>
                 <select
                   value={mode}
