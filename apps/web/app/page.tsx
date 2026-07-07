@@ -4,6 +4,16 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase";
 
+function Logo() {
+  return (
+    <div className="flex gap-1.5">
+      <div className="w-3.5 h-3.5 rounded-full bg-[#5B5BD6]" />
+      <div className="w-3.5 h-3.5 rounded-[4px] bg-[#1C9C8B]" />
+      <div className="w-0 h-0 border-l-[7px] border-l-transparent border-r-[7px] border-r-transparent border-b-[14px] border-b-[#E8A13C]" />
+    </div>
+  );
+}
+
 export default function Home() {
   const [isLoggedIn, setIsLoggedIn] = useState<boolean | null>(null);
 
@@ -12,47 +22,89 @@ export default function Home() {
   }, []);
 
   return (
-    <main className="min-h-screen flex items-center justify-center p-8">
-      <div className="card max-w-lg w-full text-center space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold mb-2">AR Classroom</h1>
-          <p className="text-white/60">
-            Collaborative drawing with AR model viewing.
-          </p>
-        </div>
+    <main className="min-h-screen bg-[#FAF8F4] flex flex-col items-center px-6 py-14 sm:py-20 gap-10">
+      <div className="flex flex-col items-center gap-3 text-center">
+        <Logo />
+        <h1 className="text-3xl sm:text-[34px] font-bold text-[#2B2A33] tracking-tight">AR Classroom</h1>
+        <p className="text-base text-[#6E6C7A] max-w-xs">
+          Draw together, then bring it to life in AR.
+        </p>
+      </div>
 
-        <div className="space-y-3">
-          <p className="text-xs text-white/40 uppercase tracking-widest">Teacher</p>
-          {isLoggedIn === null ? (
-            <div className="btn-primary w-full opacity-50 pointer-events-none">Loading…</div>
-          ) : isLoggedIn ? (
-            <Link href="/dashboard" className="btn-primary w-full block">
-              My Dashboard
-            </Link>
-          ) : (
-            <div className="grid grid-cols-2 gap-2">
-              <Link href="/login" className="btn-primary">Sign in</Link>
-              <Link href="/signup" className="btn-ghost">Create account</Link>
+      <div className="grid sm:grid-cols-2 gap-5 w-full max-w-3xl">
+        {isLoggedIn ? (
+          <div className="bg-white border border-[#E4E1D8] rounded-[28px] p-8 flex flex-col gap-4">
+            <div className="w-[52px] h-[52px] rounded-2xl bg-[#EEEEFB] flex items-center justify-center">
+              <div className="w-[22px] h-[22px] rounded-full bg-[#5B5BD6]" />
             </div>
-          )}
-        </div>
+            <div className="flex flex-col gap-1.5">
+              <h2 className="text-[22px] font-bold text-[#2B2A33]">Welcome back</h2>
+              <p className="text-[15px] text-[#6E6C7A]">You&apos;re signed in as a teacher.</p>
+            </div>
+            <Link
+              href="/dashboard"
+              className="mt-auto text-center min-h-12 flex items-center justify-center rounded-2xl bg-[#5B5BD6] text-white text-[15px] font-semibold px-5 py-3 hover:bg-[#4646C6] transition-colors"
+            >
+              Go to my dashboard →
+            </Link>
+          </div>
+        ) : (
+          <div className="bg-white border border-[#E4E1D8] rounded-[28px] p-8 flex flex-col gap-4">
+            <div className="w-[52px] h-[52px] rounded-2xl bg-[#EEEEFB] flex items-center justify-center">
+              <div className="w-[22px] h-[22px] rounded-full bg-[#5B5BD6]" />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <h2 className="text-[22px] font-bold text-[#2B2A33]">I&apos;m a teacher</h2>
+              <p className="text-[15px] text-[#6E6C7A] leading-relaxed">
+                Set up classrooms, run drawing sessions, and turn drawings into 3D models.
+              </p>
+            </div>
+            {isLoggedIn === null ? (
+              <div className="mt-auto h-12 rounded-2xl bg-[#5B5BD6]/50" />
+            ) : (
+              <div className="mt-auto grid grid-cols-2 gap-2.5">
+                <Link
+                  href="/login"
+                  className="text-center min-h-12 flex items-center justify-center rounded-2xl bg-[#5B5BD6] text-white text-[15px] font-semibold px-4 py-3 hover:bg-[#4646C6] transition-colors"
+                >
+                  Sign in
+                </Link>
+                <Link
+                  href="/signup"
+                  className="text-center min-h-12 flex items-center justify-center rounded-2xl border border-[#DBD8CE] bg-white text-[#2B2A33] text-[15px] font-semibold px-4 py-3 hover:bg-[#F3F1EA] transition-colors"
+                >
+                  Create account
+                </Link>
+              </div>
+            )}
+          </div>
+        )}
 
-        <div className="border-t border-white/10 pt-4 space-y-3">
-          <p className="text-xs text-white/40 uppercase tracking-widest">Student / Aide</p>
-          <p className="text-sm text-white/50">
-            Scan your classroom QR code or open the link your teacher shared.
-          </p>
-          <Link href="/student" className="btn-ghost w-full block">
-            Student view
-          </Link>
-        </div>
-
-        <div className="border-t border-white/10 pt-4">
-          <Link href="/ar-demo" className="text-sm text-white/40 hover:text-white/70 transition-colors">
-            AR demo (no classroom needed) →
+        <div className="bg-[#E4F5F2] border border-[#C6E8E2] rounded-[28px] p-8 flex flex-col gap-4">
+          <div className="w-[52px] h-[52px] rounded-2xl bg-white flex items-center justify-center">
+            <div className="w-[22px] h-[22px] rounded-[6px] bg-[#1C9C8B]" />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <h2 className="text-[22px] font-bold text-[#14453E]">I&apos;m a student</h2>
+            <p className="text-[15px] text-[#2E6D63] leading-relaxed">
+              Scan your classroom QR code, or tap below if your teacher gave you this device.
+            </p>
+          </div>
+          <Link
+            href="/student"
+            className="mt-auto text-center min-h-14 flex items-center justify-center rounded-2xl bg-[#1C9C8B] text-white text-base font-bold px-5 py-4 hover:bg-[#147466] transition-colors"
+          >
+            Join my classroom
           </Link>
         </div>
       </div>
+
+      <Link
+        href="/ar-demo"
+        className="text-sm text-[#9B99A6] hover:text-[#6E6C7A] transition-colors mt-auto"
+      >
+        Just curious? Try the AR demo — no classroom needed →
+      </Link>
     </main>
   );
 }
