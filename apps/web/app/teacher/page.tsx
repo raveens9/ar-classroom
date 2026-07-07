@@ -265,6 +265,9 @@ export default function TeacherPage() {
                 >
                   <option value="animals">🐾 Animals</option>
                   <option value="nature">🌿 Nature</option>
+                  <option value="numbers">🔢 Numbers</option>
+                  <option value="vegetables">🥕 Vegetables</option>
+                  <option value="shapes">🔷 Shapes</option>
                 </select>
                 <select
                   value={mode}
@@ -285,7 +288,13 @@ export default function TeacherPage() {
                 Room <span className="font-mono">{room.roomId}</span>
               </div>
               <div className="text-xs text-white/50">
-                Topic: <span className="capitalize text-white/80">{room.topic === "nature" ? "🌿 Nature" : "🐾 Animals"}</span>
+                Topic: <span className="capitalize text-white/80">{{
+                  animals: "🐾 Animals",
+                  nature: "🌿 Nature",
+                  numbers: "🔢 Numbers",
+                  vegetables: "🥕 Vegetables",
+                  shapes: "🔷 Shapes",
+                }[room.topic] ?? room.topic}</span>
               </div>
               <div className="flex gap-2">
                 <button
