@@ -3,7 +3,7 @@ import { z } from "zod";
 export const RoomModeSchema = z.enum(["OPEN", "CLOSED"]);
 export type RoomMode = z.infer<typeof RoomModeSchema>;
 
-export const TopicSchema = z.enum(["animals", "nature"]);
+export const TopicSchema = z.enum(["animals", "nature", "numbers", "vegetables", "shapes"]);
 export type Topic = z.infer<typeof TopicSchema>;
 
 export const AdmissionStateSchema = z.enum(["WAITING", "ADMITTED", "REMOVED"]);

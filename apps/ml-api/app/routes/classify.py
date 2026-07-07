@@ -1,8 +1,11 @@
 """POST /v1/classify
 
 Runs the student's cutout through the correct QuickDraw CNN based on the room topic:
-  - topic="animals"  → image_classifier_fyp.keras    (butterfly, cat, dog, fish)
-  - topic="nature"   → image_classifier_nature.keras  (cloud, flower, rain, rainbow, sun, tree)
+  - topic="animals"    → image_classifier_fyp.keras              (butterfly, cat, dog, fish)
+  - topic="nature"     → image_classifier_nature_colored.keras   (cloud, flower, rain, rainbow, sun, tree)
+  - topic="numbers"    → image_classifier_numbers.keras          (0-9)
+  - topic="vegetables" → image_classifier_vegetables.keras       (carrot, broccoli, corn, mushroom, pumpkin)
+  - topic="shapes"     → image_classifier_shapes.keras           (circle, square, triangle, rectangle, star, heart, diamond, hexagon)
 """
 from __future__ import annotations
 
@@ -30,9 +33,25 @@ TOPIC_CONFIG: dict[str, dict] = {
         "anim": {"butterfly": "fly", "cat": "walk", "dog": "run", "fish": "swim"},
     },
     "nature": {
-        "path": _MODELS_DIR / "image_classifier_nature.keras",
+        "path": _MODELS_DIR / "image_classifier_nature_colored.keras",
         "classes": ["cloud", "flower", "rain", "rainbow", "sun", "tree"],
         "anim": {"cloud": "idle", "flower": "idle", "rain": "idle", "rainbow": "idle", "sun": "idle", "tree": "idle"},
+    },
+    "numbers": {
+        "path": _MODELS_DIR / "image_classifier_numbers.keras",
+        "classes": ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"],
+        "anim": {str(i): "idle" for i in range(10)},
+    },
+    "vegetables": {
+        "path": _MODELS_DIR / "image_classifier_vegetables.keras",
+        "classes": ["carrot", "broccoli", "corn", "mushroom", "pumpkin"],
+        "anim": {"carrot": "idle", "broccoli": "idle", "corn": "idle", "mushroom": "idle", "pumpkin": "idle"},
+    },
+    "shapes": {
+        "path": _MODELS_DIR / "image_classifier_shapes.keras",
+        "classes": ["circle", "square", "triangle", "rectangle", "star", "heart", "diamond", "hexagon"],
+        "anim": {"circle": "idle", "square": "idle", "triangle": "idle", "rectangle": "idle", "star": "idle", "heart": "idle", "diamond": "idle", "hexagon": "idle"},
+        "exclude": ["star"],
     },
 }
 
@@ -44,7 +63,19 @@ def _get_model(topic: str):
         import tensorflow as tf
         cfg = TOPIC_CONFIG[topic]
         log.info("Loading %s classifier from %s", topic, cfg["path"])
-        _models[topic] = tf.keras.models.load_model(str(cfg["path"]))
+        model = tf.keras.models.load_model(str(cfg["path"]))
+        _models[topic] = model
+        # Detect class count mismatch and trim the config to match the model
+        n_model = model.output_shape[-1]
+        n_cfg   = len(cfg["classes"])
+        if n_model != n_cfg:
+            log.warning(
+                "%s model has %d outputs but config lists %d classes — "
+                "trimming config to first %d classes. "
+                "Retrain with the correct number of classes to fix this.",
+                topic, n_model, n_cfg, n_model,
+            )
+            cfg["classes"] = cfg["classes"][:n_model]
         log.info("%s classifier ready — classes: %s", topic, cfg["classes"])
     return _models[topic]
 
@@ -83,6 +114,30 @@ def _preprocess(img_bytes: bytes) -> np.ndarray:
     c1 = min(w, cols[-1] + pad + 1)
     ink_crop = ink_mask[r0:r1, c0:c1]
 
+    # If the drawing is heavily filled (coloured regions, not just outlines),
+    # extract the outline so it matches QuickDraw's line-art training style.
+    # A filled orange flower at 28x28 looks like a solid blob — the outline
+    # looks like a flower. Threshold >35% fill = treat as filled drawing.
+    ink_ratio = ink_crop.mean()
+    log.info("ink fill ratio=%.2f", ink_ratio)
+    if ink_ratio > 0.35:
+        from scipy.ndimage import binary_erosion, binary_closing, binary_fill_holes
+        bbox_size = max(ink_crop.shape)
+        # Step 1: close gaps — more aggressive depth so corner gaps in children's
+        # drawings don't create notches that look like star points at 28x28
+        close_depth = max(8, bbox_size // 15)
+        cleaned = binary_closing(ink_crop, iterations=close_depth)
+        # Step 2: flood-fill any remaining holes so the shape is fully solid
+        # before outline extraction (corner gaps that closing didn't reach become interior holes)
+        cleaned = binary_fill_holes(cleaned)
+        # Step 3: extract outline from the clean solid shape
+        erosion_depth = max(3, bbox_size // 12)
+        eroded = binary_erosion(cleaned, iterations=erosion_depth)
+        outline = cleaned & ~eroded
+        if outline.any():
+            ink_crop = outline
+            log.info("filled drawing — closed+filled+outlined (close=%d erode=%d)", close_depth, erosion_depth)
+
     binary = (ink_crop * 255).astype("uint8")
     resized = Image.fromarray(binary).resize((28, 28), Image.LANCZOS)
     arr = np.array(resized, dtype="float32") / 255.0
@@ -109,7 +164,6 @@ async def classify(body: ClassifyBody):
 
     topic = body.topic if body.topic in TOPIC_CONFIG else "animals"
     cfg = TOPIC_CONFIG[topic]
-    class_names: list[str] = cfg["classes"]
     anim_map: dict[str, str] = cfg["anim"]
 
     # Rewrite public tunnel URL → localhost so the ml-api doesn't round-trip
@@ -131,14 +185,19 @@ async def classify(body: ClassifyBody):
     try:
         arr = _preprocess(img_bytes)
         probs: np.ndarray = _get_model(topic).predict(arr, verbose=0)[0]
+        # Read class_names AFTER _get_model so any trimming is reflected
+        class_names: list[str] = cfg["classes"]
     except Exception as exc:
         log.exception("Inference failed")
         raise HTTPException(status_code=500, detail=f"Inference error: {exc}") from exc
 
     ranked = np.argsort(probs)[::-1]
-    label = class_names[int(ranked[0])]
-    confidence = float(probs[int(ranked[0])])
-    candidates = [class_names[int(i)] for i in ranked[1:]]
+    exclude: set[str] = set(cfg.get("exclude", []))
+    # Pick the top-ranked class that isn't excluded
+    winner_idx = next((i for i in ranked if class_names[int(i)] not in exclude), ranked[0])
+    label = class_names[int(winner_idx)]
+    confidence = float(probs[int(winner_idx)])
+    candidates = [class_names[int(i)] for i in ranked if i != winner_idx and class_names[int(i)] not in exclude]
 
     all_probs = {class_names[int(i)]: round(float(probs[int(i)]), 3) for i in range(len(class_names))}
     log.info("topic=%s probs=%s  winner=%s (%.0f%%)", topic, all_probs, label, confidence * 100)
