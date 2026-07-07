@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
+import { QRCodeSVG } from "qrcode.react";
 import { CollabCanvas, type CanvasHandle } from "@/components/Canvas";
 import { emitAck, getSocket } from "@/lib/socket";
 import { createClient } from "@/lib/supabase";
@@ -63,13 +64,32 @@ export default function TeacherPage() {
 
   // Track which students have signalled AR-ready from the /ar page.
   const [arReadyStudents, setArReadyStudents] = useState<Set<string>>(new Set());
+  const [joinUrl, setJoinUrl] = useState("");
+  const [showQr, setShowQr] = useState(false);
 
   useEffect(() => {
     const supabase = createClient();
     supabase.auth.getUser().then(({ data }) => {
       if (data.user) setTeacherId(data.user.id);
     });
-  }, []);
+
+    if (!sessionId) return;
+    (async () => {
+      const supabase = createClient();
+      const { data: sess } = await supabase
+        .from("sessions")
+        .select("classroom_id")
+        .eq("id", sessionId)
+        .single();
+      if (!sess) return;
+      const { data: cls } = await supabase
+        .from("classrooms")
+        .select("qr_token")
+        .eq("id", sess.classroom_id)
+        .single();
+      if (cls) setJoinUrl(`${window.location.origin}/join/${cls.qr_token}`);
+    })();
+  }, [sessionId]);
 
   useEffect(() => {
     const socket = getSocket();
@@ -315,9 +335,6 @@ export default function TeacherPage() {
                   Live
                 </span>
               )}
-              <button onClick={signOut} className="text-[13px] text-[#9B99A6] hover:text-[#6E6C7A] transition-colors">
-                Sign out
-              </button>
             </div>
           </div>
 
@@ -331,6 +348,11 @@ export default function TeacherPage() {
                 >
                   <option value="animals">Animals</option>
                   <option value="nature">Nature</option>
+                  <option value="shapes">Shapes</option>
+                  <option value="vegetables">Vegetables</option>
+                  <option value="vehicles">Vehicles</option>
+                  <option value="numbers">Numbers</option>
+                  <option value="letters">Letters</option>
                 </select>
                 <select
                   value={mode}
@@ -352,7 +374,7 @@ export default function TeacherPage() {
             <div className="flex flex-col gap-2.5">
               <div className="flex items-center justify-between">
                 <p className="text-[15px] font-bold text-[#2B2A33]">
-                  Room <span className="font-mono">{room.roomId}</span>
+                  <span>{room.topic.charAt(0).toUpperCase() + room.topic.slice(1)} drawings</span>
                 </p>
                 <p className="text-[13px] text-[#6E6C7A] capitalize">{room.topic}</p>
               </div>
@@ -552,23 +574,39 @@ export default function TeacherPage() {
               </div>
             )}
 
-            <div className="bg-white border-[1.5px] border-[#E4E1D8] rounded-[18px] p-4 flex flex-col gap-2 overflow-hidden">
+            {/* <div className="bg-white border-[1.5px] border-[#E4E1D8] rounded-[18px] p-4 flex flex-col gap-2 overflow-hidden">
               <p className="text-xs font-bold tracking-wider uppercase text-[#9B99A6]">Log</p>
               <ul className="text-xs text-[#6E6C7A] space-y-1 max-h-40 overflow-auto font-mono">
                 {log.map((l, i) => (
                   <li key={i}>{l}</li>
                 ))}
               </ul>
-            </div>
+            </div> */}
           </>
         )}
       </aside>
 
       <section className="bg-white border-[1.5px] border-[#E4E1D8] rounded-[18px] min-h-[70vh] flex flex-col overflow-hidden">
         <div className="flex items-center justify-between flex-wrap gap-3 px-4 py-3 border-b-[1.5px] border-[#E4E1D8]">
-          <h2 className="text-[15px] font-bold text-[#2B2A33]">
-            {watchedStudent ? `${watchedStudent.displayName}'s canvas` : "Select a student to watch"}
-          </h2>
+          <div className="flex items-center gap-3">
+            <h2 className="text-[15px] font-bold text-[#2B2A33]">
+              {watchedStudent ? `${watchedStudent.displayName}'s canvas` : "Select a student to watch"}
+            </h2>
+            {joinUrl && room && (
+              <button
+                onClick={() => setShowQr((v) => !v)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-[10px] text-[13px] font-semibold transition-colors ${
+                  showQr ? "bg-[#EEEEFB] text-[#4646C6]" : "border border-[#DBD8CE] text-[#6E6C7A] hover:bg-[#F3F1EA]"
+                }`}
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>
+                  <rect x="14" y="14" width="3" height="3"/><rect x="18" y="14" width="3" height="3"/><rect x="14" y="18" width="3" height="3"/><rect x="18" y="18" width="3" height="3"/>
+                </svg>
+                Join QR
+              </button>
+            )}
+          </div>
           <div className="flex items-center gap-3 flex-wrap">
             <div className="flex gap-1.5">
               {COLOR_PRESETS.map((c) => (
@@ -629,7 +667,21 @@ export default function TeacherPage() {
             </div>
           </div>
         </div>
-        <div className="flex-1 min-h-[60vh] p-4">
+        <div className="flex-1 min-h-[60vh] p-4 relative">
+          {showQr && joinUrl && (
+            <div className="absolute top-4 right-4 z-10 bg-white border-[1.5px] border-[#E4E1D8] rounded-[20px] p-5 flex flex-col items-center gap-3 shadow-[0_4px_20px_rgba(43,42,51,0.10)]">
+              <p className="text-[13px] font-bold text-[#2B2A33]">Students scan to join</p>
+              <div className="p-2 bg-white rounded-xl border border-[#E4E1D8]">
+                <QRCodeSVG value={joinUrl} size={160} />
+              </div>
+              <button
+                onClick={() => navigator.clipboard.writeText(joinUrl)}
+                className="w-full min-h-9 rounded-[10px] bg-[#EEEEFB] text-[#4646C6] text-[13px] font-bold hover:bg-[#DCDCF7] transition-colors"
+              >
+                Copy link
+              </button>
+            </div>
+          )}
           {room && watchedStudentId && teacherId ? (
             <CollabCanvas
               key={watchedStudentId}

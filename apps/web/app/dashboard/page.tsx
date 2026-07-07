@@ -123,6 +123,13 @@ export default function DashboardPage() {
     router.refresh();
   }
 
+  async function deleteClassroom(id: string, name: string) {
+    if (!confirm(`Delete "${name}"? This cannot be undone.`)) return;
+    await supabase.from("classrooms").delete().eq("id", id);
+    setClassrooms((prev) => prev.filter((c) => c.id !== id));
+    setStats((prev) => { const next = { ...prev }; delete next[id]; return next; });
+  }
+
   const sorted = [...classrooms].sort((a, b) => {
     const sa = stats[a.id];
     const sb = stats[b.id];
@@ -181,7 +188,7 @@ export default function DashboardPage() {
         {loading ? (
           <p className="text-[#9B99A6] text-sm">Loading…</p>
         ) : classrooms.length === 0 ? (
-          <div className="max-w-md flex flex-col gap-4">
+          <div className="max-w-md mx-auto flex flex-col gap-4">
             <p className="text-xs font-bold tracking-wider uppercase text-[#9B99A6]">
               First-time setup
             </p>
@@ -236,12 +243,21 @@ export default function DashboardPage() {
                     >
                       {initialsOf(c.name)}
                     </div>
-                    {s?.hasActiveSession && (
-                      <span className="flex items-center gap-1.5 bg-[#E6F4EA] text-[#1E7A3A] text-[13px] font-bold px-3 py-1.5 rounded-full">
-                        <span className="w-2 h-2 rounded-full bg-[#2C9A4B]" />
-                        Session live
-                      </span>
-                    )}
+                    <div className="flex items-center gap-2">
+                      {s?.hasActiveSession && (
+                        <span className="flex items-center gap-1.5 bg-[#E6F4EA] text-[#1E7A3A] text-[13px] font-bold px-3 py-1.5 rounded-full">
+                          <span className="w-2 h-2 rounded-full bg-[#2C9A4B]" />
+                          Session live
+                        </span>
+                      )}
+                      <button
+                        onClick={() => deleteClassroom(c.id, c.name)}
+                        className="w-8 h-8 flex items-center justify-center rounded-xl text-[#9B99A6] hover:bg-[#FBE9EA] hover:text-[#B22A35] transition-colors"
+                        title="Delete classroom"
+                      >
+                        ✕
+                      </button>
+                    </div>
                   </div>
                   <div className="flex flex-col gap-1">
                     <h2 className="text-[19px] font-bold text-[#2B2A33]">{c.name}</h2>

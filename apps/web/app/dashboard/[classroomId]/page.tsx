@@ -62,6 +62,10 @@ export default function ClassroomPage() {
         .order("display_name");
       setStudents(s ?? []);
 
+      await refreshSession();
+    }
+
+    async function refreshSession() {
       const { data: sess } = await supabase
         .from("sessions")
         .select("id, socket_room_id, created_at")
@@ -70,7 +74,14 @@ export default function ClassroomPage() {
         .maybeSingle();
       setActiveSession(sess ?? null);
     }
+
     load();
+
+    // Re-check the session whenever the user navigates back to this tab/page,
+    // so returning from the teacher view always shows the live session controls.
+    const onVisible = () => { if (document.visibilityState === "visible") refreshSession(); };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
   }, [classroomId]);
 
   async function addStudent(e: React.FormEvent) {
@@ -134,35 +145,65 @@ export default function ClassroomPage() {
 
         {/* Glanceable session status — visible regardless of tab */}
         {activeSession === undefined ? null : activeSession ? (
-          <div className="flex items-center justify-between gap-4 flex-wrap bg-[#E6F4EA] border-[1.5px] border-[#BEE3C8] rounded-[18px] px-5 py-4">
-            <div className="flex items-center gap-3">
-              <span className="w-3 h-3 rounded-full bg-[#2C9A4B] shrink-0" />
-              <div className="flex flex-col">
-                <p className="text-[15px] font-bold text-[#1E5A2F]">
-                  {activeSession.socket_room_id ? `Session live · Room ${activeSession.socket_room_id}` : "Session started"}
-                </p>
-                <p className="text-[13px] text-[#4A7D58]">
-                  {activeSession.socket_room_id
-                    ? `Started ${new Date(activeSession.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`
-                    : "Open teacher view to create the live room"}
-                </p>
+          <div className="flex flex-col gap-4 bg-[#E6F4EA] border-[1.5px] border-[#BEE3C8] rounded-[18px] px-5 py-4">
+            <div className="flex items-center justify-between gap-4 flex-wrap">
+              <div className="flex items-center gap-3">
+                <span className="w-3 h-3 rounded-full bg-[#2C9A4B] shrink-0" />
+                <div className="flex flex-col">
+                  <p className="text-[15px] font-bold text-[#1E5A2F]">
+                    {activeSession.socket_room_id ? `Session live · Room ${activeSession.socket_room_id}` : "Session started"}
+                  </p>
+                  <p className="text-[13px] text-[#4A7D58]">
+                    {activeSession.socket_room_id
+                      ? `Started ${new Date(activeSession.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`
+                      : "Open teacher view to create the live room"}
+                  </p>
+                </div>
+              </div>
+              <div className="flex gap-2.5">
+                <button
+                  className="min-h-12 px-4 rounded-[14px] bg-[#2C9A4B] text-white text-[15px] font-semibold hover:bg-[#237B3C] transition-colors"
+                  onClick={() => router.push(`/teacher?sessionId=${activeSession.id}`)}
+                >
+                  Open teacher view →
+                </button>
+                <button
+                  className="min-h-12 px-4 rounded-[14px] bg-[#FBE9EA] text-[#B22A35] text-[15px] font-semibold hover:bg-[#F6D5D8] disabled:opacity-60 transition-colors"
+                  onClick={endSession}
+                  disabled={endingSession}
+                >
+                  {endingSession ? "Ending…" : "End session"}
+                </button>
               </div>
             </div>
-            <div className="flex gap-2.5">
-              <button
-                className="min-h-12 px-4 rounded-[14px] bg-[#2C9A4B] text-white text-[15px] font-semibold hover:bg-[#237B3C] transition-colors"
-                onClick={() => router.push(`/teacher?sessionId=${activeSession.id}`)}
-              >
-                Open teacher view →
-              </button>
-              <button
-                className="min-h-12 px-4 rounded-[14px] bg-[#FBE9EA] text-[#B22A35] text-[15px] font-semibold hover:bg-[#F6D5D8] disabled:opacity-60 transition-colors"
-                onClick={endSession}
-                disabled={endingSession}
-              >
-                {endingSession ? "Ending…" : "End session"}
-              </button>
-            </div>
+
+            {joinUrl && (
+              <div className="flex flex-col sm:flex-row items-center gap-5 bg-white rounded-[14px] px-5 py-4 border border-[#BEE3C8]">
+                <div className="p-2.5 bg-white rounded-xl border border-[#E4E1D8]">
+                  <QRCodeSVG value={joinUrl} size={120} />
+                </div>
+                <div className="flex flex-col gap-2 flex-1 text-center sm:text-left">
+                  <p className="text-[15px] font-bold text-[#1E5A2F]">Students scan to join</p>
+                  <p className="text-[13px] text-[#4A7D58] leading-relaxed">
+                    Show this QR now that the session is live. Students who scanned earlier can refresh their page.
+                  </p>
+                  <div className="flex gap-2 flex-wrap justify-center sm:justify-start">
+                    <a
+                      href={joinUrl}
+                      className="min-h-9 px-3.5 flex items-center justify-center rounded-[10px] bg-[#1C9C8B] text-white text-[13px] font-semibold hover:bg-[#147466] transition-colors"
+                    >
+                      Open on this device
+                    </a>
+                    <button
+                      onClick={() => navigator.clipboard.writeText(joinUrl)}
+                      className="min-h-9 px-3.5 rounded-[10px] bg-[#EEEEFB] text-[#4646C6] text-[13px] font-bold hover:bg-[#DCDCF7] transition-colors"
+                    >
+                      Copy link
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         ) : (
           <div className="flex items-center justify-between gap-4 flex-wrap bg-white border border-[#E4E1D8] rounded-[18px] px-5 py-4">
