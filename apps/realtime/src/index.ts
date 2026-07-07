@@ -15,7 +15,7 @@ import type {
 import { registerRoomHandlers } from "./handlers/room.js";
 import { registerCanvasHandlers } from "./handlers/canvas.js";
 import { registerARHandlers } from "./handlers/ar.js";
-import { unbindSocket, getRoom, removeStudent } from "./state.js";
+import { unbindSocket } from "./state.js";
 
 const PORT = Number(process.env.PORT ?? process.env.REALTIME_PORT ?? 4002);
 const FRONTEND_ORIGIN = process.env.FRONTEND_ORIGIN ?? "https://localhost:3000";
@@ -80,15 +80,10 @@ io.on("connection", (socket) => {
   socket.on("disconnect", (reason) => {
     const id = unbindSocket(socket.id);
     console.log(`[io] disconnect ${socket.id} (${reason})`);
-    if (!id) return;
-    if (id.role === "student" && id.studentId) {
-      // Mark student as removed so teacher sees them leave.
-      const state = getRoom(id.roomId);
-      if (state && state.room.students.some((s) => s.studentId === id.studentId)) {
-        const updated = removeStudent(id.roomId, id.studentId);
-        if (updated) io.to(id.roomId).emit("room:state", updated);
-      }
-    }
+    // Students persist in the room across disconnects (e.g. navigating to /ar in a
+    // new tab). They are only removed when the teacher calls room:remove or
+    // room:close ends the session.
+    void id;
   });
 });
 

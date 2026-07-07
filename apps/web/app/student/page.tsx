@@ -1,10 +1,12 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { CollabCanvas, type CanvasHandle } from "@/components/Canvas";
 import { emitAck, getSocket } from "@/lib/socket";
 import { KidButton } from "@/components/kid/KidButton";
 import { KidStatusScreen } from "@/components/kid/KidStatusScreen";
+import { QrScanner } from "@/components/QrScanner";
 import { SoundToggle } from "@/components/kid/SoundToggle";
 import { ConfettiBurst } from "@/components/kid/ConfettiBurst";
 import { HoldButton } from "@/components/kid/HoldButton";
@@ -36,6 +38,7 @@ interface StoredSession {
 }
 
 export default function StudentPage() {
+  const router = useRouter();
   const [ident, setIdent] = useState<{ id: string; name: string } | null>(null);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [roomId, setRoomId] = useState<string>("");
@@ -48,6 +51,7 @@ export default function StudentPage() {
   const [sessionReady, setSessionReady] = useState(false);
   const [waitingForRoom, setWaitingForRoom] = useState(false);
   const [celebrate, setCelebrate] = useState(false);
+  const [scannerOpen, setScannerOpen] = useState(false);
   const arSeenRef = useRef(false);
   const canvasRef = useRef<CanvasHandle>(null);
 
@@ -64,24 +68,15 @@ export default function StudentPage() {
       });
       setRoom(r);
       setWaitingForRoom(false);
-    } catch (e) {
-      const msg = (e as Error).message;
-      if (msg === "Room not found") {
-        // The cached roomId is stale (server restarted). Clear it and fall into
-        // the polling loop — it will pick up the new roomId once the teacher's
-        // page has auto-recreated the room and updated the database.
-        setRoomId("");
-        setWaitingForRoom(true);
-        try {
-          const raw = localStorage.getItem(SESSION_KEY);
-          if (raw) {
-            const stored = JSON.parse(raw);
-            localStorage.setItem(SESSION_KEY, JSON.stringify({ ...stored, socketRoomId: null }));
-          }
-        } catch {}
-      } else {
-        setError(msg);
-      }
+    } catch {
+      // Any join failure (room gone, server restarted, etc.) — clear the cached
+      // session so the student is prompted to scan the QR code again.
+      localStorage.removeItem(SESSION_KEY);
+      setIdent(null);
+      setRoom(null);
+      setRoomId("");
+      setSessionId(null);
+      setWaitingForRoom(false);
     }
   };
 
@@ -97,6 +92,7 @@ export default function StudentPage() {
           setSessionId(stored.sessionId);
           if (stored.socketRoomId) {
             setRoomId(stored.socketRoomId);
+            setWaitingForRoom(true); // show waiting screen while join is in flight
             join(stored.socketRoomId, newIdent);
           } else {
             setWaitingForRoom(true);
@@ -221,18 +217,43 @@ export default function StudentPage() {
     setWaitingForRoom(false);
   };
 
+  const handleQrResult = (text: string) => {
+    setScannerOpen(false);
+    const trimmed = text.trim();
+    if (!trimmed) return;
+
+    try {
+      const url = new URL(trimmed);
+      if (url.origin === window.location.origin) {
+        // Same-origin URL (e.g. /join/{token}) — navigate there so the roster
+        // picker runs exactly the same flow as scanning the classroom QR.
+        router.push(url.pathname + url.search);
+        return;
+      }
+    } catch { /* not a URL — fall through */ }
+
+    // Bare room ID fallback (only useful if already identified).
+    if (!ident) return;
+    setRoomId(trimmed);
+    setWaitingForRoom(false);
+    join(trimmed, ident);
+  };
+
   if (!sessionReady) {
     return <KidStatusScreen visual="🖍️" caption="Connecting…" />;
   }
 
+  if (scannerOpen) {
+    return <QrScanner onResult={handleQrResult} onClose={() => setScannerOpen(false)} />;
+  }
+
   if (!ident) {
     return (
-      <KidStatusScreen
-        visual="📷"
-        title="Scan the classroom QR code"
-        caption="Ask your aide to scan the QR code in your classroom to get started."
-        bounce={false}
-      />
+      <KidStatusScreen visual="📷" title="Scan your classroom QR" bounce={false}>
+        <KidButton onClick={() => setScannerOpen(true)}>
+          Scan QR Code
+        </KidButton>
+      </KidStatusScreen>
     );
   }
 
@@ -243,6 +264,9 @@ export default function StudentPage() {
         title={`Hi, ${ident.name}!`}
         caption="Waiting for your teacher to open the room…"
       >
+        <KidButton onClick={() => setScannerOpen(true)}>
+          📷 Scan Room Code
+        </KidButton>
         <button
           onClick={leaveRoom}
           className="mt-2 text-sm text-kid-ink/40 transition-colors hover:text-kid-ink/70"

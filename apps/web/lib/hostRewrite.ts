@@ -21,12 +21,12 @@ export function rewriteHost(url: string): string {
 }
 
 export function realtimeUrl(): string {
-  const raw = process.env.NEXT_PUBLIC_REALTIME_URL ?? "https://localhost:4001";
-  // const raw = process.env.NEXT_PUBLIC_REALTIME_URL ?? "https://localhost:4002";
+  const raw = process.env.NEXT_PUBLIC_REALTIME_URL ?? "https://localhost:4002";
   return rewriteHost(raw);
 }
 
 export function mlApiUrl(): string {
-  const raw = process.env.NEXT_PUBLIC_ML_API_URL ?? "https://localhost:8000";
+  //const raw = process.env.NEXT_PUBLIC_ML_API_URL ?? "https://localhost:8000";
+  const raw = process.env.NEXT_PUBLIC_ML_API_URL ?? "https://localhost:8002";
   return rewriteHost(raw);
 }

@@ -12,6 +12,7 @@ import {
   mlPrepareTextureModel,
   mlRemoveBackground,
 } from "@/lib/mlApi";
+import { QRCodeSVG } from "qrcode.react";
 import type { Room, RoomMode, Topic } from "@ar/shared";
 
 // Labels available in the prepare-texture model registry, grouped by topic.
@@ -36,6 +37,7 @@ export default function TeacherPage() {
 
   const [teacherId, setTeacherId] = useState<string>("");
   const [room, setRoom] = useState<Room | null>(null);
+  const [qrToken, setQrToken] = useState<string | null>(null);
   const [mode, setMode] = useState<RoomMode>("OPEN");
   const [topic, setTopic] = useState<Topic>("animals");
   const [watchedStudentId, setWatchedStudentId] = useState<string | null>(null);
@@ -68,6 +70,22 @@ export default function TeacherPage() {
       if (data.user) setTeacherId(data.user.id);
     });
   }, []);
+
+  // Fetch the classroom's permanent qr_token so the room QR leads to the roster.
+  useEffect(() => {
+    if (!sessionId) return;
+    const supabase = createClient();
+    supabase
+      .from("sessions")
+      .select("classrooms(qr_token)")
+      .eq("id", sessionId)
+      .single()
+      .then(({ data }) => {
+        const cls = data?.classrooms as { qr_token: string } | { qr_token: string }[] | null;
+        const token = cls ? (Array.isArray(cls) ? cls[0]?.qr_token : cls.qr_token) : undefined;
+        if (token) setQrToken(token);
+      });
+  }, [sessionId]);
 
   useEffect(() => {
     const socket = getSocket();
@@ -358,6 +376,23 @@ export default function TeacherPage() {
               <button className="btn-danger w-full mt-1" onClick={endSession} disabled={busy}>
                 End session
               </button>
+              {/* QR code — links to the classroom roster (/join/{token}) so
+                  students pick their name from the roster, same as the permanent
+                  classroom QR. Falls back to a direct room URL if no session. */}
+              <div className="pt-3 border-t border-white/10 text-center space-y-2">
+                <p className="text-xs text-white/40">Student join QR</p>
+                <div className="flex justify-center rounded-xl bg-white p-3">
+                  <QRCodeSVG
+                    value={
+                      qrToken
+                        ? `${window.location.origin}/join/${qrToken}`
+                        : `${window.location.origin}/student?room=${room.roomId}`
+                    }
+                    size={148}
+                    level="M"
+                  />
+                </div>
+              </div>
             </div>
           )}
         </div>
