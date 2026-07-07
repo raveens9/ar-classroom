@@ -20,6 +20,8 @@ const TOPIC_LABELS: Record<string, string[]> = {
   nature:   ["cloud", "flower", "rain", "rainbow", "sun", "tree"],
 };
 
+const COLOR_PRESETS = ["#F472B6", "#5B5BD6", "#1C9C8B", "#E8A13C", "#D64550", "#2B2A33"];
+
 function dataUrlToBlob(dataUrl: string): Blob {
   const [header, data] = dataUrl.split(",");
   const mime = header.match(/:(.*?);/)?.[1] ?? "image/png";
@@ -293,29 +295,39 @@ export default function TeacherPage() {
   );
 
   const availableLabels = TOPIC_LABELS[room?.topic ?? "animals"] ?? TOPIC_LABELS.animals;
+  const watchedStudent = room?.students.find((s) => s.studentId === watchedStudentId);
+
+  const step2Unlocked = Boolean(prep.cutoutUrl && prep.label);
+  const step3Unlocked = Boolean(prep.modelUrl);
 
   return (
-    <main className="min-h-screen p-4 md:p-8 grid gap-4 lg:grid-cols-[320px_1fr]">
-      <aside className="space-y-4">
-        <div className="card">
-          <div className="flex items-center justify-between mb-2">
-            <Link href="/dashboard" className="text-xs text-white/40 hover:text-white/70 transition-colors">
+    <main className="min-h-screen bg-[#FAF8F4] p-4 md:p-5 grid gap-4 lg:grid-cols-[300px_1fr]">
+      <aside className="flex flex-col gap-3 overflow-hidden">
+        <div className="bg-white border-[1.5px] border-[#E4E1D8] rounded-[18px] p-4 flex flex-col gap-2.5">
+          <div className="flex items-center justify-between">
+            <Link href="/dashboard" className="text-[13px] text-[#9B99A6] hover:text-[#6E6C7A] transition-colors">
               ← Dashboard
             </Link>
-            <button onClick={signOut} className="text-xs text-white/40 hover:text-white/70 transition-colors">
-              Sign out
-            </button>
+            <div className="flex items-center gap-2">
+              {room && (
+                <span className="flex items-center gap-1.5 bg-[#E6F4EA] text-[#1E7A3A] text-xs font-bold px-2.5 py-1 rounded-full">
+                  <span className="w-[7px] h-[7px] rounded-full bg-[#2C9A4B]" />
+                  Live
+                </span>
+              )}
+              <button onClick={signOut} className="text-[13px] text-[#9B99A6] hover:text-[#6E6C7A] transition-colors">
+                Sign out
+              </button>
+            </div>
           </div>
-          <h1 className="text-lg font-semibold">Teacher</h1>
-          <p className="text-xs text-white/50 break-all">id: {teacherId}</p>
-          {sessionId && <p className="text-xs text-white/30">session: {sessionId}</p>}
+
           {!room ? (
-            <div className="mt-3 space-y-2">
+            <div className="flex flex-col gap-2 pt-1">
               <div className="flex gap-2">
                 <select
                   value={topic}
                   onChange={(e) => setTopic(e.target.value as Topic)}
-                  className="bg-white/10 rounded px-2 py-1 text-sm flex-1"
+                  className="flex-1 min-h-10 bg-white border border-[#DBD8CE] rounded-[10px] px-2 text-sm text-[#2B2A33]"
                 >
                   <option value="animals">Animals</option>
                   <option value="nature">Nature</option>
@@ -323,39 +335,50 @@ export default function TeacherPage() {
                 <select
                   value={mode}
                   onChange={(e) => setMode(e.target.value as RoomMode)}
-                  className="bg-white/10 rounded px-2 py-1 text-sm"
+                  className="min-h-10 bg-white border border-[#DBD8CE] rounded-[10px] px-2 text-sm text-[#2B2A33]"
                 >
                   <option value="OPEN">OPEN</option>
                   <option value="CLOSED">CLOSED</option>
                 </select>
               </div>
-              <button className="btn-primary w-full" onClick={createRoom}>
+              <button
+                className="min-h-11 rounded-xl bg-[#5B5BD6] text-white text-sm font-semibold hover:bg-[#4646C6] transition-colors"
+                onClick={createRoom}
+              >
                 Create room
               </button>
             </div>
           ) : (
-            <div className="mt-3 text-sm space-y-2">
-              <div>
-                Room <span className="font-mono">{room.roomId}</span>
+            <div className="flex flex-col gap-2.5">
+              <div className="flex items-center justify-between">
+                <p className="text-[15px] font-bold text-[#2B2A33]">
+                  Room <span className="font-mono">{room.roomId}</span>
+                </p>
+                <p className="text-[13px] text-[#6E6C7A] capitalize">{room.topic}</p>
               </div>
-              <div className="text-xs text-white/50">
-                Topic: <span className="capitalize text-white/80">{room.topic === "nature" ? "Nature" : "Animals"}</span>
-              </div>
-              <div className="flex gap-2">
+              <div className="flex gap-1.5 bg-[#F3F1EA] rounded-xl p-1">
                 <button
-                  className={room.mode === "OPEN" ? "btn-primary" : "btn-ghost"}
+                  className={`flex-1 text-center py-2 rounded-[9px] text-[13px] font-semibold transition-colors ${
+                    room.mode === "OPEN" ? "bg-white text-[#2B2A33] shadow-[0_1px_3px_rgba(43,42,51,0.10)]" : "text-[#6E6C7A]"
+                  }`}
                   onClick={() => setRoomMode("OPEN")}
                 >
-                  OPEN
+                  Open
                 </button>
                 <button
-                  className={room.mode === "CLOSED" ? "btn-primary" : "btn-ghost"}
+                  className={`flex-1 text-center py-2 rounded-[9px] text-[13px] font-semibold transition-colors ${
+                    room.mode === "CLOSED" ? "bg-white text-[#2B2A33] shadow-[0_1px_3px_rgba(43,42,51,0.10)]" : "text-[#6E6C7A]"
+                  }`}
                   onClick={() => setRoomMode("CLOSED")}
                 >
-                  CLOSED
+                  Closed
                 </button>
               </div>
-              <button className="btn-danger w-full mt-1" onClick={endSession} disabled={busy}>
+              <button
+                className="min-h-11 rounded-xl bg-[#FBE9EA] text-[#B22A35] text-sm font-semibold hover:bg-[#F6D5D8] disabled:opacity-60 transition-colors"
+                onClick={endSession}
+                disabled={busy}
+              >
                 End session
               </button>
             </div>
@@ -364,120 +387,174 @@ export default function TeacherPage() {
 
         {room && (
           <>
-            <div className="card">
-              <h2 className="font-medium mb-2">Waiting ({waiting.length})</h2>
-              <ul className="space-y-2">
-                {waiting.map((s) => (
-                  <li key={s.studentId} className="flex items-center justify-between text-sm">
-                    <span>{s.displayName}</span>
-                    <div className="flex gap-2">
-                      <button className="btn-primary" onClick={() => admit(s.studentId)}>Admit</button>
-                      <button className="btn-danger" onClick={() => remove(s.studentId)}>Remove</button>
+            <div className="bg-white border-[1.5px] border-[#E4E1D8] rounded-[18px] p-4 flex flex-col gap-2.5">
+              <p className="text-xs font-bold tracking-wider uppercase text-[#9B99A6]">Waiting · {waiting.length}</p>
+              {waiting.length === 0 ? (
+                <p className="text-[#9B99A6] text-sm">No one waiting.</p>
+              ) : (
+                waiting.map((s) => (
+                  <div key={s.studentId} className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div className="w-[34px] h-[34px] shrink-0 rounded-full bg-[#FDF3E3] flex items-center justify-center text-[13px] font-bold text-[#A96D14]">
+                        {s.displayName.charAt(0).toUpperCase()}
+                      </div>
+                      <span className="text-sm font-semibold text-[#2B2A33] truncate">{s.displayName}</span>
                     </div>
-                  </li>
-                ))}
-                {waiting.length === 0 && <li className="text-white/50 text-sm">No one waiting.</li>}
-              </ul>
+                    <div className="flex gap-1.5 shrink-0">
+                      <button
+                        className="min-h-10 px-3.5 rounded-[10px] bg-[#5B5BD6] text-white text-[13px] font-semibold hover:bg-[#4646C6] transition-colors"
+                        onClick={() => admit(s.studentId)}
+                      >
+                        Admit
+                      </button>
+                      <button
+                        className="min-h-10 px-2 rounded-[10px] text-[#9B99A6] text-[13px] font-semibold hover:text-[#B22A35] transition-colors"
+                        onClick={() => remove(s.studentId)}
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
 
-            <div className="card">
-              <h2 className="font-medium mb-2">Admitted ({admitted.length})</h2>
-              <ul className="space-y-2">
-                {admitted.map((s) => (
-                  <li key={s.studentId} className="flex items-center justify-between text-sm">
-                    <span className={watchedStudentId === s.studentId ? "text-brand font-medium" : ""}>
-                      {s.displayName}
-                      {arReadyStudents.has(s.studentId) && (
-                        <span className="ml-2 text-xs text-green-400 font-normal">AR Ready</span>
-                      )}
-                    </span>
-                    <div className="flex gap-2">
-                      <button className="btn-ghost" onClick={() => watch(s.studentId)}>Watch</button>
-                      <button className="btn-danger" onClick={() => remove(s.studentId)}>Remove</button>
+            <div className="bg-white border-[1.5px] border-[#E4E1D8] rounded-[18px] p-4 flex flex-col gap-2">
+              <p className="text-xs font-bold tracking-wider uppercase text-[#9B99A6]">Drawing · {admitted.length}</p>
+              {admitted.length === 0 ? (
+                <p className="text-[#9B99A6] text-sm">No one admitted.</p>
+              ) : (
+                admitted.map((s) => {
+                  const isWatched = watchedStudentId === s.studentId;
+                  const arReady = arReadyStudents.has(s.studentId);
+                  return (
+                    <div
+                      key={s.studentId}
+                      className={`flex items-center justify-between gap-2 rounded-xl px-2 py-1.5 ${
+                        isWatched ? "bg-[#EEEEFB] border-[1.5px] border-[#B9B6E8]" : ""
+                      }`}
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div className="w-[34px] h-[34px] shrink-0 rounded-full bg-white flex items-center justify-center text-[13px] font-bold text-[#4646C6]">
+                          {s.displayName.charAt(0).toUpperCase()}
+                        </div>
+                        <div className="flex flex-col min-w-0">
+                          <span className="text-sm font-bold text-[#2B2A33] truncate">{s.displayName}</span>
+                          {isWatched ? (
+                            <span className="text-[11px] font-semibold text-[#4646C6]">Watching now</span>
+                          ) : arReady ? (
+                            <span className="text-[11px] font-semibold text-[#1E7A3A]">AR ready ✓</span>
+                          ) : null}
+                        </div>
+                      </div>
+                      <div className="flex gap-1.5 shrink-0">
+                        {!isWatched && (
+                          <button
+                            className="min-h-10 px-3.5 rounded-[10px] border border-[#DBD8CE] bg-white text-[#2B2A33] text-[13px] font-semibold hover:bg-[#F3F1EA] transition-colors"
+                            onClick={() => watch(s.studentId)}
+                          >
+                            Watch
+                          </button>
+                        )}
+                        <button
+                          className="min-h-10 px-2 rounded-[10px] text-[#9B99A6] text-[13px] font-semibold hover:text-[#B22A35] transition-colors"
+                          onClick={() => remove(s.studentId)}
+                        >
+                          ✕
+                        </button>
+                      </div>
                     </div>
-                  </li>
-                ))}
-                {admitted.length === 0 && (
-                  <li className="text-white/50 text-sm">No one admitted.</li>
-                )}
-              </ul>
+                  );
+                })
+              )}
             </div>
 
             {watchedStudentId && (
-              <div className="card space-y-3">
-                <h2 className="font-medium">ML Pipeline</h2>
+              <div className="bg-white border-[1.5px] border-[#E4E1D8] rounded-[18px] p-4 flex flex-col gap-3">
+                <p className="text-xs font-bold tracking-wider uppercase text-[#9B99A6]">
+                  Make it 3D · {watchedStudent?.displayName ?? ""}
+                </p>
 
                 {/* Step 1 */}
-                <button
-                  className="btn-primary w-full"
-                  onClick={doClassify}
-                  disabled={busy}
-                >
-                  {busy && !prep.label ? "Classifying…" : "1. Classify Drawing"}
-                </button>
-
-                {/* Step 2 — shown after classify */}
-                {prep.cutoutUrl && prep.label && (
-                  <div className="space-y-2 border-t border-white/10 pt-3">
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="text-white/50">Predicted</span>
-                      <span>
-                        <strong className="text-white capitalize">{prep.label}</strong>
-                        <span className="text-white/40 ml-1">
-                          {Math.round((prep.confidence ?? 0) * 100)}%
-                        </span>
+                <div className="flex items-center gap-2.5">
+                  <div
+                    className={`w-[26px] h-[26px] shrink-0 rounded-full flex items-center justify-center text-[13px] font-bold ${
+                      prep.label ? "bg-[#2C9A4B] text-white" : "bg-[#5B5BD6] text-white"
+                    }`}
+                  >
+                    {prep.label ? "✓" : "1"}
+                  </div>
+                  {prep.label ? (
+                    <div className="flex flex-col min-w-0">
+                      <span className="text-sm font-semibold text-[#2B2A33]">Recognize drawing</span>
+                      <span className="text-xs text-[#6E6C7A]">
+                        Looks like a <strong className="text-[#2B2A33] capitalize">{prep.label}</strong> · {Math.round((prep.confidence ?? 0) * 100)}%
                       </span>
                     </div>
-
-                    <div className="flex items-center gap-2 text-xs">
-                      <span className="text-white/50 shrink-0">Override</span>
-                      <select
-                        value={selectedLabel}
-                        onChange={(e) => setSelectedLabel(e.target.value)}
-                        className="bg-white/10 rounded px-2 py-1 text-xs flex-1 capitalize"
-                      >
-                        {availableLabels.map((l) => (
-                          <option key={l} value={l} className="capitalize">
-                            {l}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
+                  ) : (
                     <button
-                      className="btn-primary w-full"
-                      onClick={doPrepare}
-                      disabled={busy || !selectedLabel}
+                      className="flex-1 min-h-10 rounded-xl bg-[#5B5BD6] text-white text-[13px] font-semibold hover:bg-[#4646C6] disabled:opacity-60 transition-colors"
+                      onClick={doClassify}
+                      disabled={busy}
                     >
-                      {busy && prep.label && !prep.modelUrl ? "Preparing…" : "2. Prepare AR Model"}
+                      {busy ? "Recognizing…" : "Recognize drawing"}
                     </button>
+                  )}
+                </div>
+
+                {prep.label && (
+                  <div className="flex items-center gap-2 pl-9">
+                    <select
+                      value={selectedLabel}
+                      onChange={(e) => setSelectedLabel(e.target.value)}
+                      className="flex-1 min-h-10 bg-white border border-[#DBD8CE] rounded-[10px] px-2.5 text-[13px] text-[#2B2A33] capitalize"
+                    >
+                      {availableLabels.map((l) => (
+                        <option key={l} value={l} className="capitalize">
+                          {l}
+                        </option>
+                      ))}
+                    </select>
                   </div>
                 )}
 
-                {/* Step 3 — shown after prepare */}
-                {prep.modelUrl && (
-                  <div className="border-t border-white/10 pt-3 space-y-2">
-                    <p className="text-xs text-white/40">
-                      Model: <span className="text-white/70 capitalize">{selectedLabel || prep.label}</span>
-                      {prep.suggestedAnimation && (
-                        <> · anim: <span className="text-white/70">{prep.suggestedAnimation}</span></>
-                      )}
-                    </p>
+                {/* Step 2 */}
+                <div className={`flex items-center gap-2.5 ${step2Unlocked ? "" : "opacity-45"}`}>
+                  <div className="w-[26px] h-[26px] shrink-0 rounded-full bg-[#5B5BD6] text-white flex items-center justify-center text-[13px] font-bold">
+                    {step3Unlocked ? "✓" : "2"}
+                  </div>
+                  <button
+                    className="flex-1 min-h-11 rounded-xl bg-[#5B5BD6] text-white text-sm font-semibold hover:bg-[#4646C6] disabled:opacity-60 transition-colors"
+                    onClick={doPrepare}
+                    disabled={busy || !step2Unlocked || !selectedLabel}
+                  >
+                    {busy && prep.label && !prep.modelUrl ? "Building…" : "Build the 3D model"}
+                  </button>
+                </div>
+
+                {/* Step 3 */}
+                <div className={`flex items-center gap-2.5 ${step3Unlocked ? "" : "opacity-45"}`}>
+                  <div className="w-[26px] h-[26px] shrink-0 rounded-full bg-[#F3F1EA] text-[#9B99A6] flex items-center justify-center text-[13px] font-bold">
+                    3
+                  </div>
+                  {step3Unlocked ? (
                     <button
-                      className="btn-primary w-full"
+                      className="flex-1 min-h-11 rounded-xl bg-[#5B5BD6] text-white text-sm font-semibold hover:bg-[#4646C6] disabled:opacity-60 transition-colors"
                       onClick={doApprove}
                       disabled={busy}
                     >
-                      {busy && prep.modelUrl ? "Publishing…" : "3. Approve & Publish AR"}
+                      {busy ? "Publishing…" : "Send to AR"}
                     </button>
-                  </div>
-                )}
+                  ) : (
+                    <span className="text-sm font-semibold text-[#6E6C7A]">Send to AR</span>
+                  )}
+                </div>
               </div>
             )}
 
-            <div className="card">
-              <h2 className="font-medium mb-2">Log</h2>
-              <ul className="text-xs text-white/60 space-y-1 max-h-48 overflow-auto">
+            <div className="bg-white border-[1.5px] border-[#E4E1D8] rounded-[18px] p-4 flex flex-col gap-2 overflow-hidden">
+              <p className="text-xs font-bold tracking-wider uppercase text-[#9B99A6]">Log</p>
+              <ul className="text-xs text-[#6E6C7A] space-y-1 max-h-40 overflow-auto font-mono">
                 {log.map((l, i) => (
                   <li key={i}>{l}</li>
                 ))}
@@ -487,17 +564,27 @@ export default function TeacherPage() {
         )}
       </aside>
 
-      <section className="card min-h-[70vh] flex flex-col">
-        <div className="flex items-center justify-between flex-wrap gap-3 mb-3">
-          <h2 className="font-medium">
-            {watchedStudentId ? `Watching: ${watchedStudentId}` : "Select a student to watch"}
+      <section className="bg-white border-[1.5px] border-[#E4E1D8] rounded-[18px] min-h-[70vh] flex flex-col overflow-hidden">
+        <div className="flex items-center justify-between flex-wrap gap-3 px-4 py-3 border-b-[1.5px] border-[#E4E1D8]">
+          <h2 className="text-[15px] font-bold text-[#2B2A33]">
+            {watchedStudent ? `${watchedStudent.displayName}'s canvas` : "Select a student to watch"}
           </h2>
-          <div className="flex items-center gap-3 text-sm flex-wrap">
-            <label className="flex items-center gap-2">
-              <span>Color</span>
-              <input type="color" value={color} onChange={(e) => setColor(e.target.value)} />
-            </label>
-            <label className="flex items-center gap-2">
+          <div className="flex items-center gap-3 flex-wrap">
+            <div className="flex gap-1.5">
+              {COLOR_PRESETS.map((c) => (
+                <button
+                  key={c}
+                  aria-label={`Color ${c}`}
+                  onClick={() => setColor(c)}
+                  className="w-8 h-8 rounded-full transition-shadow"
+                  style={{
+                    background: c,
+                    boxShadow: color === c ? "0 0 0 2px #FFFFFF, 0 0 0 4px #2B2A33" : "none",
+                  }}
+                />
+              ))}
+            </div>
+            <label className="flex items-center gap-2 text-[13px] font-semibold text-[#6E6C7A]">
               <span>Size</span>
               <input
                 type="range"
@@ -505,23 +592,44 @@ export default function TeacherPage() {
                 max={32}
                 value={size}
                 onChange={(e) => setSize(Number(e.target.value))}
+                className="accent-[#5B5BD6]"
               />
             </label>
-            <div className="flex gap-1">
-              <button className={tool === "pen" ? "btn-primary" : "btn-ghost"} onClick={() => setTool("pen")}>
+            <div className="flex gap-1 bg-[#F3F1EA] rounded-xl p-1">
+              <button
+                className={`px-4 py-2 rounded-[9px] text-[13px] font-semibold transition-colors ${
+                  tool === "pen" ? "bg-white text-[#2B2A33] shadow-[0_1px_3px_rgba(43,42,51,0.10)]" : "text-[#6E6C7A]"
+                }`}
+                onClick={() => setTool("pen")}
+              >
                 Pen
               </button>
-              <button className={tool === "eraser" ? "btn-primary" : "btn-ghost"} onClick={() => setTool("eraser")}>
+              <button
+                className={`px-4 py-2 rounded-[9px] text-[13px] font-semibold transition-colors ${
+                  tool === "eraser" ? "bg-white text-[#2B2A33] shadow-[0_1px_3px_rgba(43,42,51,0.10)]" : "text-[#6E6C7A]"
+                }`}
+                onClick={() => setTool("eraser")}
+              >
                 Eraser
               </button>
             </div>
-            <div className="flex gap-1">
-              <button className="btn-ghost" onClick={() => canvasRef.current?.undo()}>Undo</button>
-              <button className="btn-ghost" onClick={() => canvasRef.current?.redo()}>Redo</button>
+            <div className="flex gap-1.5">
+              <button
+                className="min-h-10 px-3.5 rounded-[10px] border border-[#DBD8CE] bg-white text-[#2B2A33] text-[13px] font-semibold hover:bg-[#F3F1EA] transition-colors"
+                onClick={() => canvasRef.current?.undo()}
+              >
+                ↩ Undo
+              </button>
+              <button
+                className="min-h-10 px-3.5 rounded-[10px] border border-[#DBD8CE] bg-white text-[#2B2A33] text-[13px] font-semibold hover:bg-[#F3F1EA] transition-colors"
+                onClick={() => canvasRef.current?.redo()}
+              >
+                ↪ Redo
+              </button>
             </div>
           </div>
         </div>
-        <div className="flex-1 min-h-[60vh]">
+        <div className="flex-1 min-h-[60vh] p-4">
           {room && watchedStudentId && teacherId ? (
             <CollabCanvas
               key={watchedStudentId}
@@ -534,11 +642,11 @@ export default function TeacherPage() {
               color={color}
               size={size}
               onExport={() => {}}
-              className="w-full h-full bg-black/40 rounded-md"
+              className="w-full h-full bg-white rounded-2xl border-[1.5px] border-dashed border-[#DBD8CE]"
             />
           ) : (
-            <div className="h-full flex items-center justify-center text-white/50 text-sm">
-              Pick a student from the Admitted list.
+            <div className="h-full flex items-center justify-center text-[#9B99A6] text-sm rounded-2xl border-[1.5px] border-dashed border-[#DBD8CE]">
+              Pick a student from the Drawing list.
             </div>
           )}
         </div>

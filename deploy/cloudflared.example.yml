@@ -13,12 +13,12 @@
 #   npm run start:backend   # start realtime + ml-api locally
 #   cloudflared tunnel run ar-backend
 
-tunnel: <paste-tunnel-id-here>
-credentials-file: /Users/<your-username>/.cloudflared/<tunnel-id>.json
+tunnel: 9aa03376-829b-4955-980a-777fece5e00a
+credentials-file: /Users/raveenshenuka/.cloudflared/9aa03376-829b-4955-980a-777fece5e00a.json
 
 ingress:
-  - hostname: realtime.yourdomain.com
+  - hostname: realtime.drearmer.com
     service: http://localhost:4001
-  - hostname: ml.yourdomain.com
+  - hostname: ml.drearmer.com
     service: http://localhost:8000
   - service: http_status:404

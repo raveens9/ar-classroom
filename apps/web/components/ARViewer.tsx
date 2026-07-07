@@ -128,24 +128,21 @@ export function ARViewer({ manifests }: Props) {
   return (
     <div ref={canvasRef} className="fixed inset-0 bg-black">
       {mode === "none" && (
-        <div className="absolute inset-0 flex items-center justify-center p-6">
-          <div className="card max-w-sm w-full text-center space-y-3">
-            <h2 className="text-xl font-semibold">AR View</h2>
-            <p className="text-sm text-white/70">
-              {manifests.length} model{manifests.length === 1 ? "" : "s"} in this room.
-            </p>
-            <button className="btn-primary w-full" onClick={startClassroomAR}>
-              Classroom AR
-            </button>
-            <p className="text-xs text-white/40">
-              {xrSupport === "supported"
-                ? "Tap to place models on any surface — no marker needed."
-                : "Opens a camera view — drag to look around, then anchor the models in place."}
-            </p>
-            <button className="btn-ghost w-full" onClick={startFallback}>
-              Camera view (no AR)
-            </button>
-          </div>
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-6 bg-kid-paper p-6 text-center font-kid text-kid-ink">
+          <div className="animate-kid-bounce text-8xl motion-reduce:animate-none" role="img" aria-hidden="true">🔮</div>
+          {/* One button; the code already knows whether WebXR is supported and
+              falls back to the camera view by itself. */}
+          <button
+            className="kid-btn min-h-[80px] bg-kid-grass px-10 text-2xl"
+            onClick={startClassroomAR}
+          >
+            ▶ Start
+          </button>
+          <p className="max-w-xs text-sm text-kid-ink/50">
+            {xrSupport === "supported"
+              ? "Point at the floor, then tap to place your models."
+              : "A camera view will open — look around, then tap to anchor your models."}
+          </p>
         </div>
       )}
 
@@ -190,10 +187,11 @@ export function ARViewer({ manifests }: Props) {
           </Canvas>
 
           {!cameraReady && (
-            <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-black/70 pointer-events-none px-6 text-center">
-              <p className="text-white/70 text-sm">Starting camera…</p>
+            <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/70 pointer-events-none px-6 text-center font-kid">
+              <div className="animate-kid-bounce text-6xl motion-reduce:animate-none" role="img" aria-hidden="true">📷</div>
+              <p className="text-lg font-semibold text-white">Starting camera…</p>
               {xrError && (
-                <p className="text-red-300 text-xs">
+                <p className="text-sm text-red-300">
                   WebXR unavailable ({xrError}) — showing camera view instead.
                 </p>
               )}
@@ -203,18 +201,20 @@ export function ARViewer({ manifests }: Props) {
           {/* Anchor controls */}
           <div className="absolute bottom-6 inset-x-0 flex justify-center gap-3">
             {!anchored ? (
-              <button className="btn-primary" onClick={anchor}>
-                Anchor models here
+              <button className="kid-btn bg-kid-sun" onClick={anchor}>
+                📍 Put it here!
               </button>
             ) : (
-              <button className="btn-ghost" onClick={reanchor}>
-                Re-anchor
+              <button className="kid-btn-icon bg-white" onClick={reanchor} aria-label="Move models here">
+                📍
               </button>
             )}
           </div>
 
           <div className="absolute top-3 right-3">
-            <button className="btn-ghost" onClick={() => setMode("none")}>Close</button>
+            <button className="kid-btn-icon bg-white text-2xl" onClick={() => setMode("none")} aria-label="Close camera view">
+              ✕
+            </button>
           </div>
         </>
       )}

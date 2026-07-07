@@ -7,6 +7,9 @@ import { emitAck, getSocket } from "@/lib/socket";
 import { resolveStudentId } from "@/lib/studentId";
 import { mlStylize } from "@/lib/mlApi";
 import { StylePicker } from "@/components/StylePicker";
+import { KidButton } from "@/components/kid/KidButton";
+import { KidStatusScreen } from "@/components/kid/KidStatusScreen";
+import { SoundToggle } from "@/components/kid/SoundToggle";
 import type { ARManifest, ARRoomFeed } from "@ar/shared";
 
 const ARViewer = dynamic(() => import("@/components/ARViewer").then((m) => m.ARViewer), {
@@ -103,11 +106,13 @@ export default function ARPage() {
 
   // ── Render states ──────────────────────────────────────────────────────────
 
+  // Manual room entry — an adult recovery path, so it keeps its text but wears
+  // the kid theme.
   if (!roomId) {
     return (
-      <main className="min-h-screen flex items-center justify-center p-6">
+      <main className="kid-page flex items-center justify-center p-6">
         <form
-          className="card max-w-sm w-full space-y-3"
+          className="kid-card w-full max-w-sm space-y-4"
           onSubmit={(e) => {
             e.preventDefault();
             const fd = new FormData(e.currentTarget);
@@ -115,10 +120,14 @@ export default function ARPage() {
             if (r) setRoomId(r);
           }}
         >
-          <h1 className="text-lg font-semibold">AR View</h1>
-          <p className="text-sm text-white/70">Enter your room to load AR models.</p>
-          <input name="room" className="w-full bg-white/10 rounded px-3 py-2" placeholder="room id" />
-          <button className="btn-primary w-full" type="submit">Continue</button>
+          <h1 className="text-2xl font-bold">AR View</h1>
+          <p className="text-kid-ink/60">Enter your room to load AR models.</p>
+          <input
+            name="room"
+            className="w-full rounded-2xl border-[3px] border-kid-ink/30 bg-white px-4 py-3 text-lg outline-none focus:border-kid-ink"
+            placeholder="room id"
+          />
+          <KidButton className="w-full bg-kid-sun" type="submit">Continue</KidButton>
         </form>
       </main>
     );
@@ -126,77 +135,64 @@ export default function ARPage() {
 
   if (error) {
     return (
-      <main className="min-h-screen flex items-center justify-center p-6">
-        <div className="card text-red-300 max-w-sm text-sm">{error}</div>
-      </main>
+      <KidStatusScreen visual="🙈" title="Uh oh!" caption={error} bounce={false}>
+        <KidButton className="bg-kid-sun" onClick={() => window.location.reload()}>
+          🔄 Try again
+        </KidButton>
+      </KidStatusScreen>
     );
   }
 
   if (!ready) {
-    return (
-      <main className="min-h-screen flex items-center justify-center p-6 text-white/60 text-sm">
-        Connecting…
-      </main>
-    );
+    return <KidStatusScreen visual="🪄" caption="Connecting…" />;
   }
 
   if (manifests.length === 0) {
     return (
-      <main className="min-h-screen flex items-center justify-center p-6">
-        <div className="card max-w-sm w-full text-center space-y-2">
-          <p className="text-lg font-semibold">No AR models yet</p>
-          <p className="text-sm text-white/60">
-            Your teacher hasn&apos;t published any AR models yet. Check back soon!
-          </p>
-        </div>
-      </main>
+      <KidStatusScreen
+        visual="🎁"
+        title="Not ready yet!"
+        caption="Your teacher is still making the magic. It will appear here on its own — keep waiting!"
+      />
     );
   }
 
-  // Pre-AR staging screen — student styles their model and signals ready before entering AR.
+  // Pre-AR staging screen — one giant "go" button; styling is an optional
+  // side-quest behind the paintbrush.
   if (!studentReady) {
     return (
-      <main className="min-h-screen flex items-center justify-center p-6">
-        <div className="card max-w-sm w-full space-y-5">
-          <div>
-            <h2 className="text-lg font-semibold">
-              {manifests.length} model{manifests.length === 1 ? "" : "s"} ready
-            </h2>
-            <p className="text-sm text-white/60 mt-1">
-              Optionally apply a style, then open the AR view when you&apos;re ready.
-            </p>
-          </div>
-
-          {/* Style section */}
-          <div className="space-y-2">
-            <button
-              onClick={() => setStylePickerOpen(true)}
-              disabled={styling}
-              className="btn-ghost w-full flex items-center justify-center gap-2"
-            >
-              {styling ? (
-                <>
-                  <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
-                  Applying style…
-                </>
-              ) : (
-                "Apply Style"
-              )}
-            </button>
-            {styleError && (
-              <p className="text-xs text-red-300">{styleError}</p>
-            )}
-          </div>
-
-          {/* Ready button — disabled while style transfer is running */}
-          <button
-            className="btn-primary w-full"
-            disabled={styling}
-            onClick={handleReady}
-          >
-            {styling ? "Please wait…" : "Open AR View"}
-          </button>
+      <main className="kid-page relative flex flex-col items-center justify-center gap-6 p-6 text-center">
+        <div className="absolute right-4 top-4">
+          <SoundToggle />
         </div>
+
+        <div className="animate-kid-bounce text-8xl motion-reduce:animate-none" role="img" aria-hidden="true">🪄</div>
+        <h1 className="text-3xl font-bold">Your drawing is ready!</h1>
+
+        <KidButton
+          className="min-h-[80px] bg-kid-sun px-10 text-2xl"
+          disabled={styling}
+          onClick={handleReady}
+        >
+          {styling ? "Painting…" : "✨ See the magic!"}
+        </KidButton>
+
+        <KidButton
+          icon
+          aria-label="Paint your model a different look"
+          disabled={styling}
+          onClick={() => setStylePickerOpen(true)}
+        >
+          🖌️
+        </KidButton>
+
+        {styling && (
+          <p className="flex items-center gap-2 text-kid-ink/60">
+            <span className="inline-block animate-kid-bounce text-2xl motion-reduce:animate-none" role="img" aria-hidden="true">🎨</span>
+            Painting your model…
+          </p>
+        )}
+        {styleError && <p className="max-w-xs text-sm text-kid-coral">{styleError}</p>}
 
         {/* Style picker slides up over the staging screen */}
         {stylePickerOpen && (

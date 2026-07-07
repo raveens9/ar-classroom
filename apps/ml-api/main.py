@@ -51,6 +51,12 @@ app.add_middleware(
 
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
+# Serve the web app's /public folder (3D models, etc.) via ml.drearmer.com/public
+# so modelUrls resolve even though Vercel doesn't host these large binary files.
+_WEB_PUBLIC_DIR = APP_ROOT.parent / "web" / "public"
+if _WEB_PUBLIC_DIR.exists():
+    app.mount("/public", StaticFiles(directory=str(_WEB_PUBLIC_DIR)), name="web-public")
+
 app.include_router(remove_bg.router, prefix="/v1")
 app.include_router(classify.router, prefix="/v1")
 app.include_router(prepare_texture.router, prefix="/v1")

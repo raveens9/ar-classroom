@@ -17,7 +17,17 @@ interface Classroom {
   qr_token: string;
 }
 
-type Tab = "roster" | "qr" | "session";
+type Tab = "roster" | "share";
+
+const AVATAR_STYLES = [
+  { bg: "#EEEEFB", text: "#4646C6" },
+  { bg: "#E4F5F2", text: "#147466" },
+  { bg: "#FDF3E3", text: "#A96D14" },
+];
+
+function initialOf(name: string): string {
+  return name.trim().charAt(0).toUpperCase() || "?";
+}
 
 export default function ClassroomPage() {
   const { classroomId } = useParams<{ classroomId: string }>();
@@ -27,7 +37,7 @@ export default function ClassroomPage() {
   const [newStudentName, setNewStudentName] = useState("");
   const [adding, setAdding] = useState(false);
   const [tab, setTab] = useState<Tab>("roster");
-  const [activeSession, setActiveSession] = useState<{ id: string; socket_room_id: string | null } | null | undefined>(undefined);
+  const [activeSession, setActiveSession] = useState<{ id: string; socket_room_id: string | null; created_at: string } | null | undefined>(undefined);
   const [endingSession, setEndingSession] = useState(false);
   const [startingSession, setStartingSession] = useState(false);
   const [joinUrl, setJoinUrl] = useState("");
@@ -54,7 +64,7 @@ export default function ClassroomPage() {
 
       const { data: sess } = await supabase
         .from("sessions")
-        .select("id, socket_room_id")
+        .select("id, socket_room_id, created_at")
         .eq("classroom_id", classroomId)
         .is("ended_at", null)
         .maybeSingle();
@@ -105,158 +115,178 @@ export default function ClassroomPage() {
   }
 
   if (!classroom) {
-    return <main className="min-h-screen bg-[#0b0b12] flex items-center justify-center"><p className="text-white/40">Loading…</p></main>;
+    return (
+      <main className="min-h-screen bg-[#FAF8F4] flex items-center justify-center">
+        <p className="text-[#9B99A6]">Loading…</p>
+      </main>
+    );
   }
 
   return (
-    <main className="min-h-screen bg-[#0b0b12] p-6 max-w-2xl mx-auto">
-      <div className="mb-6">
-        <Link href="/dashboard" className="text-sm text-white/40 hover:text-white/70 transition-colors">
-          ← Back
-        </Link>
-        <h1 className="text-2xl font-semibold text-white mt-2">{classroom.name}</h1>
-      </div>
-
-      {/* Tabs */}
-      <div className="flex gap-1 mb-6 bg-white/5 rounded-lg p-1 w-fit">
-        {(["roster", "qr", "session"] as Tab[]).map((t) => (
-          <button
-            key={t}
-            onClick={() => setTab(t)}
-            className={`px-4 py-1.5 rounded-md text-sm capitalize transition-colors ${
-              tab === t ? "bg-white/15 text-white" : "text-white/40 hover:text-white/70"
-            }`}
-          >
-            {t === "qr" ? "QR Code" : t === "session" ? "Session" : "Roster"}
-          </button>
-        ))}
-      </div>
-
-      {tab === "roster" && (
-        <div className="space-y-4">
-          <form onSubmit={addStudent} className="flex gap-2">
-            <input
-              type="text"
-              value={newStudentName}
-              onChange={(e) => setNewStudentName(e.target.value)}
-              placeholder="Student name"
-              className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white placeholder:text-white/30 focus:outline-none focus:border-white/30"
-            />
-            <button type="submit" disabled={adding || !newStudentName.trim()} className="btn-primary">
-              {adding ? "Adding…" : "Add"}
-            </button>
-          </form>
-
-          {students.length === 0 ? (
-            <p className="text-white/40 text-sm">No students yet. Add some above.</p>
-          ) : (
-            <ul className="space-y-2">
-              {students.map((s) => (
-                <li key={s.id} className="flex items-center justify-between bg-white/5 border border-white/10 rounded-xl px-4 py-3">
-                  <span className="text-white">{s.display_name}</span>
-                  <button
-                    onClick={() => removeStudent(s.id)}
-                    className="text-sm text-white/30 hover:text-red-400 transition-colors"
-                  >
-                    Remove
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
+    <main className="min-h-screen bg-[#FAF8F4] px-6 py-9">
+      <div className="max-w-2xl mx-auto flex flex-col gap-6">
+        <div className="flex flex-col gap-1.5">
+          <Link href="/dashboard" className="text-sm text-[#9B99A6] hover:text-[#6E6C7A] w-fit transition-colors">
+            ← My classrooms
+          </Link>
+          <h1 className="text-[28px] font-bold text-[#2B2A33] tracking-tight">{classroom.name}</h1>
         </div>
-      )}
 
-      {tab === "session" && (
-        <div className="space-y-4">
-          {activeSession === undefined ? (
-            <p className="text-white/40 text-sm">Loading…</p>
-          ) : activeSession ? (
-            <div className="space-y-3">
-              <div className="bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm space-y-1">
-                <p className="text-white/50">Active session</p>
-                {activeSession.socket_room_id ? (
-                  <p className="text-green-400 text-xs">Room live · {activeSession.socket_room_id}</p>
-                ) : (
-                  <p className="text-yellow-400 text-xs">Room not started yet — open Teacher view to create it</p>
-                )}
+        {/* Glanceable session status — visible regardless of tab */}
+        {activeSession === undefined ? null : activeSession ? (
+          <div className="flex items-center justify-between gap-4 flex-wrap bg-[#E6F4EA] border-[1.5px] border-[#BEE3C8] rounded-[18px] px-5 py-4">
+            <div className="flex items-center gap-3">
+              <span className="w-3 h-3 rounded-full bg-[#2C9A4B] shrink-0" />
+              <div className="flex flex-col">
+                <p className="text-[15px] font-bold text-[#1E5A2F]">
+                  {activeSession.socket_room_id ? `Session live · Room ${activeSession.socket_room_id}` : "Session started"}
+                </p>
+                <p className="text-[13px] text-[#4A7D58]">
+                  {activeSession.socket_room_id
+                    ? `Started ${new Date(activeSession.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`
+                    : "Open teacher view to create the live room"}
+                </p>
               </div>
-
-              {/* Share the join link directly so teacher doesn't need to scan their own QR */}
-              {joinUrl && (
-                <div className="bg-white/5 border border-white/10 rounded-xl px-4 py-3 space-y-2">
-                  <p className="text-xs text-white/50">Student join link — share this instead of QR</p>
-                  <a
-                    href={joinUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="text-xs text-blue-400 underline break-all"
-                  >
-                    {joinUrl}
-                  </a>
-                  <button
-                    onClick={() => navigator.clipboard.writeText(joinUrl)}
-                    className="btn-ghost text-xs w-full"
-                  >
-                    Copy link
-                  </button>
-                </div>
-              )}
-
+            </div>
+            <div className="flex gap-2.5">
               <button
-                className="btn-primary w-full"
+                className="min-h-12 px-4 rounded-[14px] bg-[#2C9A4B] text-white text-[15px] font-semibold hover:bg-[#237B3C] transition-colors"
                 onClick={() => router.push(`/teacher?sessionId=${activeSession.id}`)}
               >
-                Open Teacher View →
+                Open teacher view →
               </button>
               <button
-                className="btn-danger w-full"
+                className="min-h-12 px-4 rounded-[14px] bg-[#FBE9EA] text-[#B22A35] text-[15px] font-semibold hover:bg-[#F6D5D8] disabled:opacity-60 transition-colors"
                 onClick={endSession}
                 disabled={endingSession}
               >
                 {endingSession ? "Ending…" : "End session"}
               </button>
             </div>
-          ) : (
-            <div className="space-y-3">
-              <p className="text-sm text-white/60">
-                Starting a session lets students join via the QR code and begin drawing.
-              </p>
-              <button
-                className="btn-primary w-full"
-                onClick={startSession}
-                disabled={startingSession}
-              >
-                {startingSession ? "Starting…" : "Start session"}
-              </button>
-            </div>
-          )}
+          </div>
+        ) : (
+          <div className="flex items-center justify-between gap-4 flex-wrap bg-white border border-[#E4E1D8] rounded-[18px] px-5 py-4">
+            <p className="text-sm text-[#6E6C7A]">
+              Starting a session lets students join via the QR code and begin drawing.
+            </p>
+            <button
+              className="min-h-12 px-5 rounded-[14px] bg-[#5B5BD6] text-white text-[15px] font-semibold hover:bg-[#4646C6] disabled:opacity-60 transition-colors shrink-0"
+              onClick={startSession}
+              disabled={startingSession}
+            >
+              {startingSession ? "Starting…" : "Start session"}
+            </button>
+          </div>
+        )}
+
+        {/* Tabs */}
+        <div className="flex gap-1.5 bg-[#F3F1EA] rounded-[14px] p-1.5 w-fit">
+          {([
+            { key: "roster", label: "Roster" },
+            { key: "share", label: "Share & join" },
+          ] as { key: Tab; label: string }[]).map(({ key, label }) => (
+            <button
+              key={key}
+              onClick={() => setTab(key)}
+              className={`px-5 py-2.5 rounded-[10px] text-sm font-semibold transition-colors ${
+                tab === key ? "bg-white text-[#2B2A33] shadow-[0_1px_3px_rgba(43,42,51,0.10)]" : "text-[#6E6C7A] hover:text-[#2B2A33]"
+              }`}
+            >
+              {label}
+            </button>
+          ))}
         </div>
-      )}
 
-      {tab === "qr" && (
-        <div className="space-y-6">
-          <p className="text-sm text-white/60">
-            The aide scans this code to see the roster and select a student before the session starts.
-            This code is permanent — it never changes.
-          </p>
+        {tab === "roster" && (
+          <div className="flex flex-col gap-3">
+            <form onSubmit={addStudent} className="flex gap-2.5">
+              <input
+                type="text"
+                value={newStudentName}
+                onChange={(e) => setNewStudentName(e.target.value)}
+                placeholder="Add a student by name…"
+                className="flex-1 min-h-12 bg-white border border-[#DBD8CE] rounded-[10px] px-3.5 py-3 text-[15px] text-[#2B2A33] placeholder:text-[#9B99A6] outline-none focus:border-[#5B5BD6] focus:ring-4 focus:ring-[#EEEEFB] transition-colors"
+              />
+              <button
+                type="submit"
+                disabled={adding || !newStudentName.trim()}
+                className="min-h-12 px-5 rounded-[14px] bg-[#5B5BD6] text-white text-[15px] font-semibold hover:bg-[#4646C6] disabled:opacity-60 transition-colors"
+              >
+                {adding ? "Adding…" : "Add"}
+              </button>
+            </form>
 
-          {joinUrl && (
-            <div className="flex flex-col items-center gap-4">
-              <div className="bg-white p-4 rounded-2xl">
-                <QRCodeSVG value={joinUrl} size={220} />
+            {students.length === 0 ? (
+              <p className="text-[#9B99A6] text-sm">No students yet. Add some above.</p>
+            ) : (
+              <div className="grid sm:grid-cols-2 gap-2.5">
+                {students.map((s, i) => {
+                  const avatar = AVATAR_STYLES[i % AVATAR_STYLES.length];
+                  return (
+                    <div
+                      key={s.id}
+                      className="flex items-center justify-between bg-white border border-[#E4E1D8] rounded-2xl px-4 py-3"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div
+                          className="w-[38px] h-[38px] rounded-full flex items-center justify-center text-sm font-bold"
+                          style={{ background: avatar.bg, color: avatar.text }}
+                        >
+                          {initialOf(s.display_name)}
+                        </div>
+                        <span className="text-[15px] font-semibold text-[#2B2A33]">{s.display_name}</span>
+                      </div>
+                      <button
+                        onClick={() => removeStudent(s.id)}
+                        className="text-[13px] font-semibold text-[#9B99A6] px-3 py-2.5 rounded-[10px] hover:bg-[#FBE9EA] hover:text-[#B22A35] transition-colors"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  );
+                })}
               </div>
-              <p className="text-xs text-white/40 text-center break-all max-w-xs">{joinUrl}</p>
-              <button
-                onClick={() => navigator.clipboard.writeText(joinUrl)}
-                className="btn-ghost text-sm"
-              >
-                Copy link
-              </button>
+            )}
+          </div>
+        )}
+
+        {tab === "share" && (
+          <div className="max-w-[420px] flex flex-col gap-4">
+            <div className="bg-white border-[1.5px] border-[#E4E1D8] rounded-[24px] p-7 flex flex-col items-center gap-4 text-center">
+              <div className="flex flex-col gap-1">
+                <h2 className="text-xl font-bold text-[#2B2A33]">Join {classroom.name}</h2>
+                <p className="text-sm text-[#6E6C7A]">Scan with any phone or tablet camera</p>
+              </div>
+
+              {joinUrl && (
+                <>
+                  <div className="p-4 bg-white rounded-[20px] border-[1.5px] border-[#E4E1D8]">
+                    <QRCodeSVG value={joinUrl} size={220} />
+                  </div>
+                  <a
+                    href={joinUrl}
+                    className="w-full min-h-14 flex items-center justify-center rounded-2xl bg-[#1C9C8B] text-white text-base font-bold hover:bg-[#147466] transition-colors"
+                  >
+                    Open student view on this device
+                  </a>
+                  <div className="w-full flex items-center gap-2.5 bg-[#FAF8F4] border-[1.5px] border-[#E4E1D8] rounded-xl px-3 py-2.5">
+                    <span className="flex-1 font-mono text-xs text-[#6E6C7A] overflow-hidden text-ellipsis whitespace-nowrap text-left">
+                      {joinUrl}
+                    </span>
+                    <button
+                      onClick={() => navigator.clipboard.writeText(joinUrl)}
+                      className="shrink-0 min-h-10 px-3.5 rounded-[10px] bg-[#EEEEFB] text-[#4646C6] text-[13px] font-bold hover:bg-[#DCDCF7] transition-colors"
+                    >
+                      Copy link
+                    </button>
+                  </div>
+                  <p className="text-[13px] text-[#9B99A6]">This code is permanent — print it and pin it up.</p>
+                </>
+              )}
             </div>
-          )}
-        </div>
-      )}
+          </div>
+        )}
+      </div>
     </main>
   );
 }
