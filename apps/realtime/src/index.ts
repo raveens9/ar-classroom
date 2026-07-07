@@ -17,7 +17,7 @@ import { registerCanvasHandlers } from "./handlers/canvas.js";
 import { registerARHandlers } from "./handlers/ar.js";
 import { unbindSocket, getRoom, removeStudent } from "./state.js";
 
-const PORT = Number(process.env.PORT ?? process.env.REALTIME_PORT ?? 4002);
+const PORT = Number(process.env.PORT ?? process.env.REALTIME_PORT ?? 4001);
 const FRONTEND_ORIGIN = process.env.FRONTEND_ORIGIN ?? "https://localhost:3000";
 const ALLOW_ALL_ORIGINS = (process.env.ALLOW_ALL_ORIGINS ?? "true").toLowerCase() === "true";
 const TLS_ENABLED = (process.env.TLS_ENABLED ?? "true").toLowerCase() === "true";
