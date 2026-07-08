@@ -15,6 +15,11 @@ from PIL import Image
 from skimage.color import lab2rgb, rgb2lab
 
 from style_transfer.io.glb_loader import GlbAsset, MaterialType
+from style_transfer.palette.extract import (
+    _MIN_BACKGROUND_KEEP_FRACTION,
+    _MIN_BACKGROUND_KEEP_PIXELS,
+    background_mask,
+)
 
 _MAX_PROCESS_SIZE = 512  # cap large textures before palette lookup; upsample after
 
@@ -23,6 +28,8 @@ def recolor_texture_histogram(
     texture: np.ndarray,
     drawing: np.ndarray,
     intensity: float = 0.8,
+    background_color: tuple[int, int, int] | None = None,
+    background_threshold: float = 12.0,
 ) -> np.ndarray:
     """Transfer the drawing's colour distribution to the texture via histogram matching.
 
@@ -35,13 +42,26 @@ def recolor_texture_histogram(
         texture: RGB uint8 array (H, W, 3).
         drawing: RGB uint8 array (H, W, 3) — the child's drawing.
         intensity: Blend strength; 1.0 = full match, 0.0 = unchanged.
+        background_color: If given, the drawing's canvas background colour —
+            excluded from the reference distribution so a large flat canvas
+            (e.g. white) doesn't skew the texture towards it.
+        background_threshold: Delta-E below which a pixel counts as background.
 
     Returns:
         Recoloured uint8 array (H, W, 3).
     """
     from skimage.exposure import match_histograms
 
-    matched = match_histograms(texture, drawing, channel_axis=-1).astype(np.float32)
+    reference = drawing
+    if background_color is not None:
+        keep = background_mask(drawing, background_color, background_threshold)
+        pixels = drawing.reshape(-1, 3)
+        min_keep = max(_MIN_BACKGROUND_KEEP_PIXELS,
+                       int(_MIN_BACKGROUND_KEEP_FRACTION * len(pixels)))
+        if keep.sum() >= min_keep:
+            reference = pixels[keep].reshape(-1, 1, 3)
+
+    matched = match_histograms(texture, reference, channel_axis=-1).astype(np.float32)
     original = texture.astype(np.float32)
     blended = intensity * matched + (1.0 - intensity) * original
     return np.clip(blended, 0, 255).round().astype(np.uint8)

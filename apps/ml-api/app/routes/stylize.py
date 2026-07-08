@@ -7,8 +7,10 @@ POST /v1/stylize
 """
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
+import time
 import uuid
 from pathlib import Path
 
@@ -27,6 +29,13 @@ STYLED_DIR = STATIC_DIR / "styled"
 
 # Internal URL of the style-transfer service. No TLS needed for service-to-service.
 _STYLE_TRANSFER_URL = os.getenv("STYLE_TRANSFER_URL", "http://localhost:8001").rstrip("/")
+
+# Ceiling on total time spent waiting for a queued job — this is a genuine
+# "give up" limit, not an artifact of one blocking call, since the job queue
+# means concurrent requests no longer serialize behind a fully-blocked
+# connection. Polling itself is cheap and near-instant per request.
+_JOB_POLL_INTERVAL_S = 1.0
+_JOB_MAX_WAIT_S = 300.0
 
 
 class StylizeBody(BaseModel):
@@ -48,7 +57,7 @@ async def stylize(body: StylizeBody) -> StylizeResponse:
     STYLED_DIR.mkdir(parents=True, exist_ok=True)
 
     # Use verify=False because dev TLS certs are self-signed.
-    async with httpx.AsyncClient(verify=False, timeout=120.0) as client:
+    async with httpx.AsyncClient(verify=False, timeout=30.0) as client:
         # Fetch the base GLB model.
         try:
             glb_resp = await client.get(body.model_url)
@@ -82,17 +91,50 @@ async def stylize(body: StylizeBody) -> StylizeResponse:
             "tier":         str(effective_tier),
         }
 
+        # Submit to the style-transfer service's job queue rather than making
+        # one long blocking call — under concurrent load (multiple students
+        # styling at once) a single blocking call queues behind whichever
+        # request the service happens to be running and can exceed a fixed
+        # timeout even though nothing is actually wrong. The job queue
+        # accepts every submission instantly; we then poll for completion.
         try:
-            st_resp = await client.post(
-                f"{_STYLE_TRANSFER_URL}/stylize",
+            submit_resp = await client.post(
+                f"{_STYLE_TRANSFER_URL}/stylize/jobs",
                 files=files,
                 data=data,
             )
-            st_resp.raise_for_status()
-            styled_bytes = st_resp.content
+            submit_resp.raise_for_status()
+            job_id = submit_resp.json()["job_id"]
         except httpx.HTTPStatusError as exc:
             detail = exc.response.text[:400] if exc.response else str(exc)
             raise HTTPException(status_code=502, detail=f"Style transfer failed: {detail}") from exc
+        except Exception as exc:
+            raise HTTPException(status_code=503, detail=f"Style transfer service unreachable: {exc}") from exc
+
+        deadline = time.monotonic() + _JOB_MAX_WAIT_S
+        while True:
+            try:
+                status_resp = await client.get(f"{_STYLE_TRANSFER_URL}/stylize/jobs/{job_id}")
+                status_resp.raise_for_status()
+                status = status_resp.json()
+            except Exception as exc:
+                raise HTTPException(status_code=503, detail=f"Style transfer service unreachable: {exc}") from exc
+
+            if status["status"] == "done":
+                break
+            if status["status"] == "error":
+                raise HTTPException(status_code=502, detail=f"Style transfer failed: {status.get('error')}")
+            if time.monotonic() > deadline:
+                raise HTTPException(
+                    status_code=504,
+                    detail=f"Style transfer job {job_id} timed out waiting in queue.",
+                )
+            await asyncio.sleep(_JOB_POLL_INTERVAL_S)
+
+        try:
+            result_resp = await client.get(f"{_STYLE_TRANSFER_URL}/stylize/jobs/{job_id}/result")
+            result_resp.raise_for_status()
+            styled_bytes = result_resp.content
         except Exception as exc:
             raise HTTPException(status_code=503, detail=f"Style transfer service unreachable: {exc}") from exc
 

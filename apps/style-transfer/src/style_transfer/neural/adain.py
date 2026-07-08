@@ -64,18 +64,35 @@ def _deprocess(tensor: torch.Tensor, device: str) -> np.ndarray:
     return (t.cpu().numpy() * 255.0).astype(np.uint8)
 
 
-def _gram_matrix(feat: torch.Tensor) -> torch.Tensor:
-    """Normalised Gram matrix of (1, C, H, W) feature map → (1, C, C)."""
+def _gram_matrix(feat: torch.Tensor, mask: torch.Tensor | None = None) -> torch.Tensor:
+    """Normalised Gram matrix of (1, C, H, W) feature map → (1, C, C).
+
+    Args:
+        feat: (1, C, H, W) feature map.
+        mask: Optional (1, 1, H, W) foreground mask — locations where it's 0
+            are zeroed out and excluded from the normalisation count, so a
+            drawing's flat canvas background doesn't contribute its own
+            (spurious) texture statistics to the style target.
+    """
     b, c, h, w = feat.shape
+    if mask is not None:
+        feat = feat * mask
+        n = mask.sum().clamp(min=1.0) * c
+    else:
+        n = c * h * w
     f = feat.reshape(b, c, h * w)
-    return torch.bmm(f, f.transpose(1, 2)) / (c * h * w)
+    return torch.bmm(f, f.transpose(1, 2)) / n
 
 
 # ---------------------------------------------------------------------------
 # Core AdaIN operation
 # ---------------------------------------------------------------------------
 
-def adain(content_feat: torch.Tensor, style_feat: torch.Tensor) -> torch.Tensor:
+def adain(
+    content_feat: torch.Tensor,
+    style_feat: torch.Tensor,
+    style_mask: torch.Tensor | None = None,
+) -> torch.Tensor:
     """Apply AdaIN: transfer channel-wise statistics from style to content.
 
     Formula: σ(style) × (content − μ(content)) / σ(content) + μ(style)
@@ -83,6 +100,10 @@ def adain(content_feat: torch.Tensor, style_feat: torch.Tensor) -> torch.Tensor:
     Args:
         content_feat: (N, C, H, W) content feature map.
         style_feat:   (N, C, H, W) style feature map (from the drawing).
+        style_mask:   Optional (N, 1, H, W) foreground mask — restricts
+            μ(style)/σ(style) to the masked-in locations, e.g. excluding a
+            drawing's flat canvas background so it can't dominate the
+            channel statistics used to restyle the texture.
 
     Returns:
         Stylised feature map, same shape as content_feat.
@@ -90,8 +111,16 @@ def adain(content_feat: torch.Tensor, style_feat: torch.Tensor) -> torch.Tensor:
     eps = 1e-5
     c_mean = content_feat.mean(dim=[2, 3], keepdim=True)
     c_std  = content_feat.std( dim=[2, 3], keepdim=True).clamp(min=eps)
-    s_mean = style_feat.mean(  dim=[2, 3], keepdim=True)
-    s_std  = style_feat.std(   dim=[2, 3], keepdim=True).clamp(min=eps)
+
+    if style_mask is None:
+        s_mean = style_feat.mean(dim=[2, 3], keepdim=True)
+        s_std  = style_feat.std( dim=[2, 3], keepdim=True).clamp(min=eps)
+    else:
+        n = style_mask.sum(dim=[2, 3], keepdim=True).clamp(min=1.0)
+        s_mean = (style_feat * style_mask).sum(dim=[2, 3], keepdim=True) / n
+        s_var  = ((style_feat - s_mean) ** 2 * style_mask).sum(dim=[2, 3], keepdim=True) / n
+        s_std  = s_var.clamp(min=eps ** 2).sqrt()
+
     return s_std * (content_feat - c_mean) / c_std + s_mean
 
 
@@ -175,6 +204,8 @@ def stylize_texture(
     n_steps: int = 100,
     content_weight: float = 1.0,
     style_weight: float = 1e4,
+    background_color: tuple[int, int, int] | None = None,
+    background_threshold: float = 12.0,
 ) -> np.ndarray:
     """AdaIN texture stylisation via gradient-based image optimisation.
 
@@ -194,6 +225,14 @@ def stylize_texture(
         n_steps:        Adam iterations for image reconstruction.
         content_weight: Loss weight for AdaIN-feature MSE.
         style_weight:   Loss weight for multi-scale Gram-matrix style loss.
+        background_color: If given, the drawing's canvas background colour.
+            The style image's flat canvas is masked out of the style
+            statistics (both the AdaIN mean/std and the Gram-matrix style
+            loss, at every VGG scale) so it can't dominate them — a plain
+            bounding-box crop isn't enough here since a drawing can be sparse
+            strokes spread across the whole canvas, leaving mostly background
+            inside the crop too.
+        background_threshold: Delta-E below which a pixel counts as background.
 
     Returns:
         Stylised RGB uint8 array (H, W, 3) at original texture resolution.
@@ -206,8 +245,24 @@ def stylize_texture(
         style_t        = _preprocess(style_image, process_size, device)
         content_feat   = enc(content_t)
         style_feats_ms = enc.multi_scale(style_t)
-        target_feat    = adain(content_feat, style_feats_ms[-1])
-        style_grams    = [_gram_matrix(f) for f in style_feats_ms]
+
+        style_masks_ms: list[torch.Tensor | None] = [None] * 4
+        if background_color is not None:
+            from style_transfer.palette.extract import background_mask
+            style_resized = np.array(
+                Image.fromarray(style_image[..., :3]).resize((process_size, process_size), Image.LANCZOS)
+            )
+            fg = background_mask(style_resized, background_color, background_threshold)
+            fg = torch.from_numpy(fg.reshape(1, 1, process_size, process_size)).float().to(device)
+            style_masks_ms = [
+                nn.functional.interpolate(fg, size=f.shape[2:], mode="nearest")
+                for f in style_feats_ms
+            ]
+
+        target_feat = adain(content_feat, style_feats_ms[-1], style_mask=style_masks_ms[-1])
+        style_grams = [
+            _gram_matrix(f, mask=style_masks_ms[i]) for i, f in enumerate(style_feats_ms)
+        ]
 
     canvas = content_t.clone().detach().requires_grad_(True)
     optimizer = optim.Adam([canvas], lr=0.01)

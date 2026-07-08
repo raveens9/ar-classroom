@@ -42,6 +42,15 @@ MODELS_DIR     = _ROOT / "models"
 DEFAULT_PALETTE_K: int   = 6      # number of dominant colours for k-means
 DEFAULT_INTENSITY: float = 0.8    # style blend strength (0.0 – 1.0)
 
+# The web app's drawing canvas is a fixed colour (its own background, not part
+# of the child's drawing). Hard-coded here since the canvas colour is a
+# frontend constant, not something derived from the image itself.
+DRAWING_BACKGROUND_COLOR: tuple[int, int, int] = (14, 14, 17)  # canvas background
+BACKGROUND_DELTA_E_THRESHOLD: float = 3.5  # Lab ΔE below which a pixel counts as background
+# Kept tight because the canvas colour above is near-black — a looser threshold
+# (e.g. the 12.0 used for a white canvas) would also strip real black/near-black
+# outline strokes from the drawing, since those sit only ~4.3 ΔE from (14,14,17).
+
 VALID_STYLE_CHOICES: tuple[str, ...] = (
     "child_colors",
     # --- Feed-forward trained presets (Johnson et al. 2016) ---
