@@ -371,10 +371,15 @@ async def preview_palette(
         import io as _io
         import numpy as np
         from PIL import Image
+        from style_transfer.config import BACKGROUND_DELTA_E_THRESHOLD, DRAWING_BACKGROUND_COLOR
         from style_transfer.palette.extract import palette_from_image
 
         img = np.array(Image.open(_io.BytesIO(drawing_bytes)).convert("RGB"), dtype=np.uint8)
-        palette = palette_from_image(img, k=k)
+        palette = palette_from_image(
+            img, k=k,
+            background_color=DRAWING_BACKGROUND_COLOR,
+            background_threshold=BACKGROUND_DELTA_E_THRESHOLD,
+        )
         colours = [
             {"r": int(c[0] * 255), "g": int(c[1] * 255), "b": int(c[2] * 255)}
             for c in palette

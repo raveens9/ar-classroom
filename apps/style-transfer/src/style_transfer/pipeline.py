@@ -101,7 +101,9 @@ def _run_tier1(
     import io as _io
     import numpy as np
     from PIL import Image as _Image
-    from style_transfer.config import DEFAULT_PALETTE_K
+    from style_transfer.config import (
+        BACKGROUND_DELTA_E_THRESHOLD, DEFAULT_PALETTE_K, DRAWING_BACKGROUND_COLOR,
+    )
     from style_transfer.io.glb_loader import load_glb, extract_textures
     from style_transfer.io.glb_writer import inject_textures, update_material_colors
     from style_transfer.palette.extract import extract_palette
@@ -117,13 +119,21 @@ def _run_tier1(
     if textures:
         # Histogram match each texture to the drawing
         styled_textures = {
-            idx: recolor_texture_histogram(tex, drawing, intensity=intensity)
+            idx: recolor_texture_histogram(
+                tex, drawing, intensity=intensity,
+                background_color=DRAWING_BACKGROUND_COLOR,
+                background_threshold=BACKGROUND_DELTA_E_THRESHOLD,
+            )
             for idx, tex in textures.items()
         }
         styled_asset = inject_textures(asset, styled_textures)
 
         # Also recolor any flat materials using palette fallback
-        palette = extract_palette(str(drawing_path), k=DEFAULT_PALETTE_K)
+        palette = extract_palette(
+            str(drawing_path), k=DEFAULT_PALETTE_K,
+            background_color=DRAWING_BACKGROUND_COLOR,
+            background_threshold=BACKGROUND_DELTA_E_THRESHOLD,
+        )
         from style_transfer.io.glb_loader import MaterialType
         flat_colors = {
             m.index: recolor_flat_material(m.base_color_factor, palette, intensity)
@@ -135,7 +145,11 @@ def _run_tier1(
         return styled_asset.raw_bytes
     else:
         # No textures — fall back to palette recolor on flat materials
-        palette = extract_palette(str(drawing_path), k=DEFAULT_PALETTE_K)
+        palette = extract_palette(
+            str(drawing_path), k=DEFAULT_PALETTE_K,
+            background_color=DRAWING_BACKGROUND_COLOR,
+            background_threshold=BACKGROUND_DELTA_E_THRESHOLD,
+        )
         styled = recolor_asset(asset, palette, intensity=intensity)
         return styled.raw_bytes
 
@@ -155,7 +169,9 @@ def _run_tier2(
     import numpy as np
     from PIL import Image
 
-    from style_transfer.config import DEFAULT_PALETTE_K, DEVICE
+    from style_transfer.config import (
+        BACKGROUND_DELTA_E_THRESHOLD, DEFAULT_PALETTE_K, DEVICE, DRAWING_BACKGROUND_COLOR,
+    )
     from style_transfer.io.glb_loader import extract_textures, load_glb
     from style_transfer.io.glb_writer import inject_textures
     from style_transfer.neural.adain import VGGEncoder, stylize_texture
@@ -220,7 +236,11 @@ def _run_tier2(
         uv_mask = tex_array.mean(axis=2) > 5  # non-black pixels ≈ UV island
 
         def _stylise(t, _enc=enc, _drawing=drawing_img, _intensity=intensity):
-            return stylize_texture(t, _drawing, intensity=_intensity, encoder=_enc, device=DEVICE)
+            return stylize_texture(
+                t, _drawing, intensity=_intensity, encoder=_enc, device=DEVICE,
+                background_color=DRAWING_BACKGROUND_COLOR,
+                background_threshold=BACKGROUND_DELTA_E_THRESHOLD,
+            )
 
         styled_textures[idx] = apply_seam_aware_stylisation(tex_array, uv_mask, _stylise)
 
