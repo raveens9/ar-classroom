@@ -71,23 +71,22 @@ export default function ARPage() {
   }, [roomId, studentId]);
 
   async function applyStyle(styleChoice: string) {
-    if (styling || manifests.length === 0) return;
+    const myManifest = manifests.find((m) => m.authorId === studentId);
+    if (styling || !myManifest) return;
     setStyling(true);
     setStylePickerOpen(false);
     setStyleError(null);
     try {
-      for (const manifest of manifests) {
-        const styledUrl = await mlStylize({
-          modelUrl: manifest.modelUrl,
-          drawingUrl: manifest.textureUrl,
-          styleChoice,
-        });
-        await emitAck("ar:restyle", {
-          roomId,
-          manifestId: manifest.manifestId,
-          styledModelUrl: styledUrl,
-        });
-      }
+      const styledUrl = await mlStylize({
+        modelUrl: myManifest.modelUrl,
+        drawingUrl: myManifest.textureUrl,
+        styleChoice,
+      });
+      await emitAck("ar:restyle", {
+        roomId,
+        manifestId: myManifest.manifestId,
+        styledModelUrl: styledUrl,
+      });
     } catch (e) {
       setStyleError((e as Error).message);
     } finally {
