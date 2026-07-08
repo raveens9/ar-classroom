@@ -9,6 +9,7 @@ POST /stylize/preview  — extract palette colours from a drawing
 
 from __future__ import annotations
 
+import asyncio
 import pathlib
 import tempfile
 import time
@@ -120,7 +121,9 @@ async def stylize_upload(
             out_path  = tmp / "styled.glb"
             glb_path.write_bytes(glb_bytes)
             draw_path.write_bytes(drawing_bytes)
-            elapsed = _run_pipeline(glb_path, draw_path, style_choice, intensity, tier, out_path)
+            elapsed = await asyncio.to_thread(
+                _run_pipeline, glb_path, draw_path, style_choice, intensity, tier, out_path
+            )
             return _build_response(out_path.read_bytes(), style_choice, tier, elapsed)
     except RuntimeError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
@@ -160,7 +163,9 @@ async def stylize_by_name(
             draw_path = tmp / "drawing.png"
             out_path  = tmp / "styled.glb"
             draw_path.write_bytes(drawing_bytes)
-            elapsed = _run_pipeline(glb_path, draw_path, style_choice, intensity, tier, out_path)
+            elapsed = await asyncio.to_thread(
+                _run_pipeline, glb_path, draw_path, style_choice, intensity, tier, out_path
+            )
             return _build_response(out_path.read_bytes(), style_choice, tier, elapsed)
     except RuntimeError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
@@ -205,7 +210,9 @@ async def stylize_by_class(
             draw_path = tmp / "drawing.png"
             out_path  = tmp / "styled.glb"
             draw_path.write_bytes(drawing_bytes)
-            elapsed = _run_pipeline(glb_path, draw_path, style_choice, intensity, tier, out_path)
+            elapsed = await asyncio.to_thread(
+                _run_pipeline, glb_path, draw_path, style_choice, intensity, tier, out_path
+            )
             return _build_response(
                 out_path.read_bytes(), style_choice, tier, elapsed,
                 extra_headers={"X-Model-Category": category, "X-Model-Name": name},
@@ -311,14 +318,18 @@ async def stylize_multi(
             if has_drawing:
                 step += 1
                 out = tmp / f"step{step}_tier1.glb"
-                _run_pipeline(current, draw_path, "child_colors", intensity, 1, out)
+                await asyncio.to_thread(
+                    _run_pipeline, current, draw_path, "child_colors", intensity, 1, out
+                )
                 current = out
 
             # Steps 1-N: apply each Tier-2 style in the order given
             for style in style_list:
                 step += 1
                 out = tmp / f"step{step}_{style}.glb"
-                _run_pipeline(current, draw_path, style, intensity, 2, out)
+                await asyncio.to_thread(
+                    _run_pipeline, current, draw_path, style, intensity, 2, out
+                )
                 current = out
 
             final_bytes = current.read_bytes()
