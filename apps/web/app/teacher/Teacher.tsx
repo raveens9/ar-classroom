@@ -17,11 +17,27 @@ import type { Room, RoomMode, Topic } from "@ar/shared";
 
 // Labels available in the prepare-texture model registry, grouped by topic.
 const TOPIC_LABELS: Record<string, string[]> = {
-  animals:  ["butterfly", "cat", "dog", "fish", "dragon", "dinosaur", "robot", "bird"],
-  nature:   ["cloud", "flower", "rain", "rainbow", "sun", "tree"],
+  animals: [
+    "butterfly",
+    "cat",
+    "dog",
+    "fish",
+    "dragon",
+    "dinosaur",
+    "robot",
+    "bird",
+  ],
+  nature: ["cloud", "flower", "rain", "rainbow", "sun", "tree"],
 };
 
-const COLOR_PRESETS = ["#F472B6", "#5B5BD6", "#1C9C8B", "#E8A13C", "#D64550", "#2B2A33"];
+const COLOR_PRESETS = [
+  "#F472B6",
+  "#5B5BD6",
+  "#1C9C8B",
+  "#E8A13C",
+  "#D64550",
+  "#2B2A33",
+];
 
 function dataUrlToBlob(dataUrl: string): Blob {
   const [header, data] = dataUrl.split(",");
@@ -52,7 +68,7 @@ export default function TeacherPage() {
   // Pipeline state — each field is set as the corresponding step completes.
   const [prep, setPrep] = useState<{
     cutoutUrl?: string;
-    label?: string;       // predicted 3D model label from classifier
+    label?: string; // predicted 3D model label from classifier
     confidence?: number;
     suggestedAnimation?: string;
     modelUrl?: string;
@@ -63,7 +79,9 @@ export default function TeacherPage() {
   const [selectedLabel, setSelectedLabel] = useState<string>("");
 
   // Track which students have signalled AR-ready from the /ar page.
-  const [arReadyStudents, setArReadyStudents] = useState<Set<string>>(new Set());
+  const [arReadyStudents, setArReadyStudents] = useState<Set<string>>(
+    new Set(),
+  );
   const [joinUrl, setJoinUrl] = useState("");
   const [showQr, setShowQr] = useState(false);
 
@@ -97,7 +115,9 @@ export default function TeacherPage() {
       if (!room || r.roomId === room.roomId) setRoom(r);
     };
     socket.on("room:state", onRoom);
-    return () => { socket.off("room:state", onRoom); };
+    return () => {
+      socket.off("room:state", onRoom);
+    };
   }, [room]);
 
   // Listen for students signalling they are ready in the AR view.
@@ -109,7 +129,9 @@ export default function TeacherPage() {
       setArReadyStudents((prev) => new Set([...prev, p.studentId]));
     };
     socket.on("ar:student-ready", onStudentReady);
-    return () => { socket.off("ar:student-ready", onStudentReady); };
+    return () => {
+      socket.off("ar:student-ready", onStudentReady);
+    };
   }, [room]);
 
   // Reset pipeline state whenever the teacher switches to a different student.
@@ -126,7 +148,10 @@ export default function TeacherPage() {
       appendLog(`Created room ${r.roomId} (${r.mode})`);
       if (sessionId) {
         const supabase = createClient();
-        await supabase.from("sessions").update({ socket_room_id: r.roomId }).eq("id", sessionId);
+        await supabase
+          .from("sessions")
+          .update({ socket_room_id: r.roomId })
+          .eq("id", sessionId);
       }
     } catch (e) {
       appendLog(`ERR: ${(e as Error).message}`);
@@ -141,7 +166,10 @@ export default function TeacherPage() {
       await emitAck("room:close", { roomId: room.roomId });
       if (sessionId) {
         const supabase = createClient();
-        await supabase.from("sessions").update({ ended_at: new Date().toISOString() }).eq("id", sessionId);
+        await supabase
+          .from("sessions")
+          .update({ ended_at: new Date().toISOString() })
+          .eq("id", sessionId);
       }
       appendLog("Session ended");
       router.push("/dashboard");
@@ -156,7 +184,11 @@ export default function TeacherPage() {
     setMode(m);
     if (!room) return;
     try {
-      const r = await emitAck("room:create", { teacherId, mode: m, topic: room?.topic ?? topic });
+      const r = await emitAck("room:create", {
+        teacherId,
+        mode: m,
+        topic: room?.topic ?? topic,
+      });
       setRoom(r);
       appendLog(`Room mode → ${m}`);
     } catch (e) {
@@ -177,7 +209,10 @@ export default function TeacherPage() {
   const remove = async (studentId: string) => {
     if (!room) return;
     try {
-      const r = await emitAck("room:remove", { roomId: room.roomId, studentId });
+      const r = await emitAck("room:remove", {
+        roomId: room.roomId,
+        studentId,
+      });
       setRoom(r);
       if (watchedStudentId === studentId) setWatchedStudentId(null);
     } catch (e) {
@@ -191,15 +226,13 @@ export default function TeacherPage() {
   };
 
   const appendLog = (line: string) =>
-    setLog((l) => [`[${new Date().toLocaleTimeString()}] ${line}`, ...l].slice(0, 50));
-
-  const signOut = async () => {
-    await createClient().auth.signOut();
-    router.push("/login");
-  };
+    setLog((l) =>
+      [`[${new Date().toLocaleTimeString()}] ${line}`, ...l].slice(0, 50),
+    );
 
   const exportCanvas = (): string | null => {
-    const fn = (window as unknown as { __canvasExport?: () => string }).__canvasExport;
+    const fn = (window as unknown as { __canvasExport?: () => string })
+      .__canvasExport;
     return fn ? fn() : null;
   };
 
@@ -214,7 +247,11 @@ export default function TeacherPage() {
       setPrep((p) => ({ ...p, cutoutUrl: r.cutoutUrl }));
       appendLog(`Remove BG OK → ${r.cutoutId}`);
 
-      const c = await mlClassify(r.cutoutUrl, watchedStudentId, room?.topic ?? "animals");
+      const c = await mlClassify(
+        r.cutoutUrl,
+        watchedStudentId,
+        room?.topic ?? "animals",
+      );
       setPrep((p) => ({
         ...p,
         label: c.label,
@@ -244,9 +281,14 @@ export default function TeacherPage() {
         studentId: watchedStudentId,
         animationName: prep.suggestedAnimation,
       });
-      setPrep((p) => ({ ...p, modelUrl: t.modelUrl, textureUrl: t.textureUrl }));
+      setPrep((p) => ({
+        ...p,
+        modelUrl: t.modelUrl,
+        textureUrl: t.textureUrl,
+      }));
       appendLog(`Prepared model ${t.modelUrl}`);
-      if (selectedLabel !== prep.label) appendLog(`Label overridden: ${prep.label} → ${selectedLabel}`);
+      if (selectedLabel !== prep.label)
+        appendLog(`Label overridden: ${prep.label} → ${selectedLabel}`);
     } catch (e) {
       appendLog(`ERR prepare: ${(e as Error).message}`);
     } finally {
@@ -259,7 +301,9 @@ export default function TeacherPage() {
     if (!room || !watchedStudentId || !prep.modelUrl) return;
     setBusy(true);
     try {
-      const student = room.students.find((s) => s.studentId === watchedStudentId);
+      const student = room.students.find(
+        (s) => s.studentId === watchedStudentId,
+      );
       const r = await mlApproveGenerateAR({
         roomId: room.roomId,
         studentId: watchedStudentId,
@@ -270,7 +314,10 @@ export default function TeacherPage() {
         animationName: prep.suggestedAnimation,
         label: selectedLabel || prep.label,
       });
-      await emitAck("ar:publish", { roomId: room.roomId, manifest: r.manifest });
+      await emitAck("ar:publish", {
+        roomId: room.roomId,
+        manifest: r.manifest,
+      });
       appendLog(`Published AR for ${watchedStudentId}`);
 
       if (sessionId) {
@@ -280,8 +327,12 @@ export default function TeacherPage() {
           if (dataUrl) {
             const blob = dataUrlToBlob(dataUrl);
             const path = `${sessionId}/${watchedStudentId}-${Date.now()}.png`;
-            await supabase.storage.from("drawings").upload(path, blob, { contentType: "image/png" });
-            const { data: { publicUrl } } = supabase.storage.from("drawings").getPublicUrl(path);
+            await supabase.storage
+              .from("drawings")
+              .upload(path, blob, { contentType: "image/png" });
+            const {
+              data: { publicUrl },
+            } = supabase.storage.from("drawings").getPublicUrl(path);
             await supabase.from("drawings").insert({
               session_id: sessionId,
               student_id: watchedStudentId,
@@ -307,15 +358,18 @@ export default function TeacherPage() {
 
   const waiting = useMemo(
     () => (room ? room.students.filter((s) => s.state === "WAITING") : []),
-    [room]
+    [room],
   );
   const admitted = useMemo(
     () => (room ? room.students.filter((s) => s.state === "ADMITTED") : []),
-    [room]
+    [room],
   );
 
-  const availableLabels = TOPIC_LABELS[room?.topic ?? "animals"] ?? TOPIC_LABELS.animals;
-  const watchedStudent = room?.students.find((s) => s.studentId === watchedStudentId);
+  const availableLabels =
+    TOPIC_LABELS[room?.topic ?? "animals"] ?? TOPIC_LABELS.animals;
+  const watchedStudent = room?.students.find(
+    (s) => s.studentId === watchedStudentId,
+  );
 
   const step2Unlocked = Boolean(prep.cutoutUrl && prep.label);
   const step3Unlocked = Boolean(prep.modelUrl);
@@ -325,7 +379,10 @@ export default function TeacherPage() {
       <aside className="flex flex-col gap-3 overflow-hidden">
         <div className="bg-white border-[1.5px] border-[#E4E1D8] rounded-[18px] p-4 flex flex-col gap-2.5">
           <div className="flex items-center justify-between">
-            <Link href="/dashboard" className="text-[13px] text-[#9B99A6] hover:text-[#6E6C7A] transition-colors">
+            <Link
+              href="/dashboard"
+              className="text-[13px] text-[#9B99A6] hover:text-[#6E6C7A] transition-colors"
+            >
               ← Dashboard
             </Link>
             <div className="flex items-center gap-2">
@@ -374,14 +431,21 @@ export default function TeacherPage() {
             <div className="flex flex-col gap-2.5">
               <div className="flex items-center justify-between">
                 <p className="text-[15px] font-bold text-[#2B2A33]">
-                  <span>{room.topic.charAt(0).toUpperCase() + room.topic.slice(1)} drawings</span>
+                  <span>
+                    {room.topic.charAt(0).toUpperCase() + room.topic.slice(1)}{" "}
+                    drawings
+                  </span>
                 </p>
-                <p className="text-[13px] text-[#6E6C7A] capitalize">{room.topic}</p>
+                <p className="text-[13px] text-[#6E6C7A] capitalize">
+                  {room.topic}
+                </p>
               </div>
               <div className="flex gap-1.5 bg-[#F3F1EA] rounded-xl p-1">
                 <button
                   className={`flex-1 text-center py-2 rounded-[9px] text-[13px] font-semibold transition-colors ${
-                    room.mode === "OPEN" ? "bg-white text-[#2B2A33] shadow-[0_1px_3px_rgba(43,42,51,0.10)]" : "text-[#6E6C7A]"
+                    room.mode === "OPEN"
+                      ? "bg-white text-[#2B2A33] shadow-[0_1px_3px_rgba(43,42,51,0.10)]"
+                      : "text-[#6E6C7A]"
                   }`}
                   onClick={() => setRoomMode("OPEN")}
                 >
@@ -389,7 +453,9 @@ export default function TeacherPage() {
                 </button>
                 <button
                   className={`flex-1 text-center py-2 rounded-[9px] text-[13px] font-semibold transition-colors ${
-                    room.mode === "CLOSED" ? "bg-white text-[#2B2A33] shadow-[0_1px_3px_rgba(43,42,51,0.10)]" : "text-[#6E6C7A]"
+                    room.mode === "CLOSED"
+                      ? "bg-white text-[#2B2A33] shadow-[0_1px_3px_rgba(43,42,51,0.10)]"
+                      : "text-[#6E6C7A]"
                   }`}
                   onClick={() => setRoomMode("CLOSED")}
                 >
@@ -410,17 +476,24 @@ export default function TeacherPage() {
         {room && (
           <>
             <div className="bg-white border-[1.5px] border-[#E4E1D8] rounded-[18px] p-4 flex flex-col gap-2.5">
-              <p className="text-xs font-bold tracking-wider uppercase text-[#9B99A6]">Waiting · {waiting.length}</p>
+              <p className="text-xs font-bold tracking-wider uppercase text-[#9B99A6]">
+                Waiting · {waiting.length}
+              </p>
               {waiting.length === 0 ? (
                 <p className="text-[#9B99A6] text-sm">No one waiting.</p>
               ) : (
                 waiting.map((s) => (
-                  <div key={s.studentId} className="flex items-center justify-between gap-2">
+                  <div
+                    key={s.studentId}
+                    className="flex items-center justify-between gap-2"
+                  >
                     <div className="flex items-center gap-2.5 min-w-0">
                       <div className="w-[34px] h-[34px] shrink-0 rounded-full bg-[#FDF3E3] flex items-center justify-center text-[13px] font-bold text-[#A96D14]">
                         {s.displayName.charAt(0).toUpperCase()}
                       </div>
-                      <span className="text-sm font-semibold text-[#2B2A33] truncate">{s.displayName}</span>
+                      <span className="text-sm font-semibold text-[#2B2A33] truncate">
+                        {s.displayName}
+                      </span>
                     </div>
                     <div className="flex gap-1.5 shrink-0">
                       <button
@@ -442,7 +515,9 @@ export default function TeacherPage() {
             </div>
 
             <div className="bg-white border-[1.5px] border-[#E4E1D8] rounded-[18px] p-4 flex flex-col gap-2">
-              <p className="text-xs font-bold tracking-wider uppercase text-[#9B99A6]">Drawing · {admitted.length}</p>
+              <p className="text-xs font-bold tracking-wider uppercase text-[#9B99A6]">
+                Drawing · {admitted.length}
+              </p>
               {admitted.length === 0 ? (
                 <p className="text-[#9B99A6] text-sm">No one admitted.</p>
               ) : (
@@ -453,7 +528,9 @@ export default function TeacherPage() {
                     <div
                       key={s.studentId}
                       className={`flex items-center justify-between gap-2 rounded-xl px-2 py-1.5 ${
-                        isWatched ? "bg-[#EEEEFB] border-[1.5px] border-[#B9B6E8]" : ""
+                        isWatched
+                          ? "bg-[#EEEEFB] border-[1.5px] border-[#B9B6E8]"
+                          : ""
                       }`}
                     >
                       <div className="flex items-center gap-2.5 min-w-0">
@@ -461,11 +538,17 @@ export default function TeacherPage() {
                           {s.displayName.charAt(0).toUpperCase()}
                         </div>
                         <div className="flex flex-col min-w-0">
-                          <span className="text-sm font-bold text-[#2B2A33] truncate">{s.displayName}</span>
+                          <span className="text-sm font-bold text-[#2B2A33] truncate">
+                            {s.displayName}
+                          </span>
                           {isWatched ? (
-                            <span className="text-[11px] font-semibold text-[#4646C6]">Watching now</span>
+                            <span className="text-[11px] font-semibold text-[#4646C6]">
+                              Watching now
+                            </span>
                           ) : arReady ? (
-                            <span className="text-[11px] font-semibold text-[#1E7A3A]">AR ready ✓</span>
+                            <span className="text-[11px] font-semibold text-[#1E7A3A]">
+                              AR ready ✓
+                            </span>
                           ) : null}
                         </div>
                       </div>
@@ -501,16 +584,24 @@ export default function TeacherPage() {
                 <div className="flex items-center gap-2.5">
                   <div
                     className={`w-[26px] h-[26px] shrink-0 rounded-full flex items-center justify-center text-[13px] font-bold ${
-                      prep.label ? "bg-[#2C9A4B] text-white" : "bg-[#5B5BD6] text-white"
+                      prep.label
+                        ? "bg-[#2C9A4B] text-white"
+                        : "bg-[#5B5BD6] text-white"
                     }`}
                   >
                     {prep.label ? "✓" : "1"}
                   </div>
                   {prep.label ? (
                     <div className="flex flex-col min-w-0">
-                      <span className="text-sm font-semibold text-[#2B2A33]">Recognize drawing</span>
+                      <span className="text-sm font-semibold text-[#2B2A33]">
+                        Recognize drawing
+                      </span>
                       <span className="text-xs text-[#6E6C7A]">
-                        Looks like a <strong className="text-[#2B2A33] capitalize">{prep.label}</strong> · {Math.round((prep.confidence ?? 0) * 100)}%
+                        Looks like a{" "}
+                        <strong className="text-[#2B2A33] capitalize">
+                          {prep.label}
+                        </strong>{" "}
+                        · {Math.round((prep.confidence ?? 0) * 100)}%
                       </span>
                     </div>
                   ) : (
@@ -541,7 +632,9 @@ export default function TeacherPage() {
                 )}
 
                 {/* Step 2 */}
-                <div className={`flex items-center gap-2.5 ${step2Unlocked ? "" : "opacity-45"}`}>
+                <div
+                  className={`flex items-center gap-2.5 ${step2Unlocked ? "" : "opacity-45"}`}
+                >
                   <div className="w-[26px] h-[26px] shrink-0 rounded-full bg-[#5B5BD6] text-white flex items-center justify-center text-[13px] font-bold">
                     {step3Unlocked ? "✓" : "2"}
                   </div>
@@ -550,12 +643,16 @@ export default function TeacherPage() {
                     onClick={doPrepare}
                     disabled={busy || !step2Unlocked || !selectedLabel}
                   >
-                    {busy && prep.label && !prep.modelUrl ? "Building…" : "Build the 3D model"}
+                    {busy && prep.label && !prep.modelUrl
+                      ? "Building…"
+                      : "Build the 3D model"}
                   </button>
                 </div>
 
                 {/* Step 3 */}
-                <div className={`flex items-center gap-2.5 ${step3Unlocked ? "" : "opacity-45"}`}>
+                <div
+                  className={`flex items-center gap-2.5 ${step3Unlocked ? "" : "opacity-45"}`}
+                >
                   <div className="w-[26px] h-[26px] shrink-0 rounded-full bg-[#F3F1EA] text-[#9B99A6] flex items-center justify-center text-[13px] font-bold">
                     3
                   </div>
@@ -568,7 +665,9 @@ export default function TeacherPage() {
                       {busy ? "Publishing…" : "Send to AR"}
                     </button>
                   ) : (
-                    <span className="text-sm font-semibold text-[#6E6C7A]">Send to AR</span>
+                    <span className="text-sm font-semibold text-[#6E6C7A]">
+                      Send to AR
+                    </span>
                   )}
                 </div>
               </div>
@@ -590,18 +689,36 @@ export default function TeacherPage() {
         <div className="flex items-center justify-between flex-wrap gap-3 px-4 py-3 border-b-[1.5px] border-[#E4E1D8]">
           <div className="flex items-center gap-3">
             <h2 className="text-[15px] font-bold text-[#2B2A33]">
-              {watchedStudent ? `${watchedStudent.displayName}'s canvas` : "Select a student to watch"}
+              {watchedStudent
+                ? `${watchedStudent.displayName}'s canvas`
+                : "Select a student to watch"}
             </h2>
             {joinUrl && room && (
               <button
                 onClick={() => setShowQr((v) => !v)}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-[10px] text-[13px] font-semibold transition-colors ${
-                  showQr ? "bg-[#EEEEFB] text-[#4646C6]" : "border border-[#DBD8CE] text-[#6E6C7A] hover:bg-[#F3F1EA]"
+                  showQr
+                    ? "bg-[#EEEEFB] text-[#4646C6]"
+                    : "border border-[#DBD8CE] text-[#6E6C7A] hover:bg-[#F3F1EA]"
                 }`}
               >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                  <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>
-                  <rect x="14" y="14" width="3" height="3"/><rect x="18" y="14" width="3" height="3"/><rect x="14" y="18" width="3" height="3"/><rect x="18" y="18" width="3" height="3"/>
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <rect x="3" y="3" width="7" height="7" />
+                  <rect x="14" y="3" width="7" height="7" />
+                  <rect x="3" y="14" width="7" height="7" />
+                  <rect x="14" y="14" width="3" height="3" />
+                  <rect x="18" y="14" width="3" height="3" />
+                  <rect x="14" y="18" width="3" height="3" />
+                  <rect x="18" y="18" width="3" height="3" />
                 </svg>
                 Join QR
               </button>
@@ -617,7 +734,10 @@ export default function TeacherPage() {
                   className="w-8 h-8 rounded-full transition-shadow"
                   style={{
                     background: c,
-                    boxShadow: color === c ? "0 0 0 2px #FFFFFF, 0 0 0 4px #2B2A33" : "none",
+                    boxShadow:
+                      color === c
+                        ? "0 0 0 2px #FFFFFF, 0 0 0 4px #2B2A33"
+                        : "none",
                   }}
                 />
               ))}
@@ -636,7 +756,9 @@ export default function TeacherPage() {
             <div className="flex gap-1 bg-[#F3F1EA] rounded-xl p-1">
               <button
                 className={`px-4 py-2 rounded-[9px] text-[13px] font-semibold transition-colors ${
-                  tool === "pen" ? "bg-white text-[#2B2A33] shadow-[0_1px_3px_rgba(43,42,51,0.10)]" : "text-[#6E6C7A]"
+                  tool === "pen"
+                    ? "bg-white text-[#2B2A33] shadow-[0_1px_3px_rgba(43,42,51,0.10)]"
+                    : "text-[#6E6C7A]"
                 }`}
                 onClick={() => setTool("pen")}
               >
@@ -644,7 +766,9 @@ export default function TeacherPage() {
               </button>
               <button
                 className={`px-4 py-2 rounded-[9px] text-[13px] font-semibold transition-colors ${
-                  tool === "eraser" ? "bg-white text-[#2B2A33] shadow-[0_1px_3px_rgba(43,42,51,0.10)]" : "text-[#6E6C7A]"
+                  tool === "eraser"
+                    ? "bg-white text-[#2B2A33] shadow-[0_1px_3px_rgba(43,42,51,0.10)]"
+                    : "text-[#6E6C7A]"
                 }`}
                 onClick={() => setTool("eraser")}
               >
@@ -670,7 +794,9 @@ export default function TeacherPage() {
         <div className="flex-1 min-h-[60vh] p-4 relative">
           {showQr && joinUrl && (
             <div className="absolute top-4 right-4 z-10 bg-white border-[1.5px] border-[#E4E1D8] rounded-[20px] p-5 flex flex-col items-center gap-3 shadow-[0_4px_20px_rgba(43,42,51,0.10)]">
-              <p className="text-[13px] font-bold text-[#2B2A33]">Students scan to join</p>
+              <p className="text-[13px] font-bold text-[#2B2A33]">
+                Students scan to join
+              </p>
               <div className="p-2 bg-white rounded-xl border border-[#E4E1D8]">
                 <QRCodeSVG value={joinUrl} size={160} />
               </div>
