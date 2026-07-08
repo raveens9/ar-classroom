@@ -5,12 +5,23 @@ POST /stylize/by-name  — pick a model from the catalog by name → styled .glb
 POST /stylize/by-class — pass classifier output (class name) + drawing → styled .glb
 POST /stylize/multi    — sequential style pipeline → one final .glb
 POST /stylize/preview  — extract palette colours from a drawing
+
+POST /stylize/jobs               — enqueue a job, returns immediately with a job_id
+GET  /stylize/jobs/{id}          — poll job status / queue position
+GET  /stylize/jobs/{id}/result   — fetch the finished .glb
+
+Prefer the /stylize/jobs flow under concurrent load: the plain endpoints
+above hold the HTTP connection open for the entire 5-30s of processing, so
+a burst of simultaneous callers queues up behind whichever request the
+server happens to be running and can trip a caller-side timeout. The job
+queue accepts every request instantly and lets callers poll instead.
 """
 
 from __future__ import annotations
 
 import asyncio
 import pathlib
+import shutil
 import tempfile
 import time
 from typing import Annotated
@@ -18,6 +29,7 @@ from typing import Annotated
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from fastapi.responses import Response
 
+from backend import jobs
 from backend.config import STYLE_CATALOGUE, GLB_DIR, resolve_model_path, resolve_class_name
 
 router = APIRouter()
@@ -356,6 +368,88 @@ async def stylize_multi(
             "X-Model-Category": _category,
             "X-Pipeline":       pipeline_label,
         },
+    )
+
+
+# ── Job queue: POST /stylize/jobs, GET /stylize/jobs/{id}[/result] ───────────
+
+@router.post("/stylize/jobs", summary="Enqueue a style-transfer job — returns immediately with a job_id")
+async def stylize_enqueue(
+    base_model:   Annotated[UploadFile, File(description="Base .glb 3D model file")],
+    drawing:      Annotated[UploadFile, File(description="Child's drawing (PNG or JPEG)")],
+    style_choice: Annotated[str,   Form(description="Style preset name. Call GET /styles for options.")] = "child_colors",
+    intensity:    Annotated[float, Form(description="Style blend strength 0.0 -> 1.0")] = 0.8,
+    tier:         Annotated[int,   Form(description="1=palette, 2=neural, 12=chained")] = 1,
+) -> dict:
+    """Submit a style-transfer job to the queue instead of blocking on it.
+
+    Poll GET /stylize/jobs/{job_id} for status, then GET
+    /stylize/jobs/{job_id}/result once status is "done".
+    """
+    _validate_params(style_choice, intensity, tier)
+
+    glb_bytes     = await base_model.read()
+    drawing_bytes = await drawing.read()
+    if not glb_bytes:
+        raise HTTPException(status_code=422, detail="base_model file is empty.")
+    if not drawing_bytes:
+        raise HTTPException(status_code=422, detail="drawing file is empty.")
+
+    # Can't use tempfile.TemporaryDirectory() here — it would be cleaned up
+    # when this request handler returns, before a queued job even starts.
+    tmp_dir   = pathlib.Path(tempfile.mkdtemp(prefix="stylejob_"))
+    glb_path  = tmp_dir / "input.glb"
+    draw_path = tmp_dir / "drawing.png"
+    out_path  = tmp_dir / "styled.glb"
+    glb_path.write_bytes(glb_bytes)
+    draw_path.write_bytes(drawing_bytes)
+
+    def _job() -> tuple[bytes, dict]:
+        try:
+            elapsed = _run_pipeline(glb_path, draw_path, style_choice, intensity, tier, out_path)
+            return out_path.read_bytes(), {
+                "style_applied": style_choice,
+                "tier_used": tier,
+                "elapsed": elapsed,
+            }
+        finally:
+            shutil.rmtree(tmp_dir, ignore_errors=True)
+
+    job_id = await jobs.submit(_job)
+    return {"job_id": job_id, "status": "queued", "queue_position": jobs.queue_position(job_id)}
+
+
+@router.get("/stylize/jobs/{job_id}", summary="Poll a style-transfer job's status")
+async def stylize_job_status(job_id: str) -> dict:
+    job = jobs.get_job(job_id)
+    if job is None:
+        raise HTTPException(status_code=404, detail="Unknown job_id.")
+    resp: dict = {
+        "job_id": job.id,
+        "status": job.status,
+        "queue_position": jobs.queue_position(job_id),
+    }
+    if job.status == "done":
+        resp.update(job.meta)
+    if job.status == "error":
+        resp["error"] = job.error
+    return resp
+
+
+@router.get("/stylize/jobs/{job_id}/result", summary="Fetch the finished .glb for a job")
+async def stylize_job_result(job_id: str) -> Response:
+    job = jobs.get_job(job_id)
+    if job is None:
+        raise HTTPException(status_code=404, detail="Unknown job_id.")
+    if job.status == "error":
+        raise HTTPException(status_code=502, detail=f"Job failed: {job.error}")
+    if job.status != "done" or job.result_bytes is None:
+        raise HTTPException(status_code=409, detail=f"Job not finished yet (status={job.status}).")
+    return _build_response(
+        job.result_bytes,
+        job.meta.get("style_applied", ""),
+        job.meta.get("tier_used", 0),
+        job.meta.get("elapsed", 0.0),
     )
 
 
