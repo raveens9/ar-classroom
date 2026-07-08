@@ -45,7 +45,7 @@ export default function TeacherPage() {
   const [color, setColor] = useState("#f472b6");
   const [size, setSize] = useState(5);
   const [tool, setTool] = useState<"pen" | "eraser">("pen");
-  const [log, setLog] = useState<string[]>([]);
+  const [, setLog] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
   const canvasRef = useRef<CanvasHandle>(null);
 

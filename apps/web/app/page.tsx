@@ -30,7 +30,7 @@ export default function Home() {
   };
 
   return (
-    <main className="min-h-screen bg-[#FAF8F4] flex flex-col items-center px-6 py-14 sm:py-20 gap-10">
+    <main className="min-h-screen bg-cover bg-center flex flex-col items-center px-6 py-14 sm:py-20 gap-10" style={{ backgroundImage: "linear-gradient(rgba(255,255,255,0.55), rgba(255,255,255,0.55)), url('/login-bg2.jpg')" }}>
       <div className="flex flex-col items-center gap-3 text-center">
         <Logo />
         <h1 className="text-3xl sm:text-[34px] font-bold text-[#2B2A33] tracking-tight">AR Classroom</h1>

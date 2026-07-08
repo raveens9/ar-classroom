@@ -28,7 +28,7 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="min-h-screen flex items-center justify-center bg-[#FAF8F4] p-4">
+    <main className="min-h-screen flex items-center justify-center bg-cover bg-center p-4" style={{ backgroundImage: "linear-gradient(rgba(255,255,255,0.55), rgba(255,255,255,0.55)), url('/login-bg2.jpg')" }}>
       <div className="w-full max-w-[420px] bg-white border border-[#E4E1D8] rounded-[24px] p-8 flex flex-col items-center gap-6">
         <div className="flex flex-col items-center gap-2 text-center">
           <div className="flex gap-1.5">
