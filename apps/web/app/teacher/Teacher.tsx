@@ -61,7 +61,7 @@ export default function TeacherPage() {
   const [color, setColor] = useState("#f472b6");
   const [size, setSize] = useState(5);
   const [tool, setTool] = useState<"pen" | "eraser">("pen");
-  const [, setLog] = useState<string[]>([]);
+  const [log, setLog] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
   const canvasRef = useRef<CanvasHandle>(null);
 
@@ -693,7 +693,7 @@ export default function TeacherPage() {
                 ? `${watchedStudent.displayName}'s canvas`
                 : "Select a student to watch"}
             </h2>
-            {joinUrl && room && (
+            {room && (
               <button
                 onClick={() => setShowQr((v) => !v)}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-[10px] text-[13px] font-semibold transition-colors ${
@@ -792,22 +792,25 @@ export default function TeacherPage() {
           </div>
         </div>
         <div className="flex-1 min-h-[60vh] p-4 relative">
-          {showQr && joinUrl && (
-            <div className="absolute top-4 right-4 z-10 bg-white border-[1.5px] border-[#E4E1D8] rounded-[20px] p-5 flex flex-col items-center gap-3 shadow-[0_4px_20px_rgba(43,42,51,0.10)]">
-              <p className="text-[13px] font-bold text-[#2B2A33]">
-                Students scan to join
-              </p>
-              <div className="p-2 bg-white rounded-xl border border-[#E4E1D8]">
-                <QRCodeSVG value={joinUrl} size={160} />
+          {showQr && room && (() => {
+            const qrUrl = joinUrl || `${window.location.origin}/student?room=${room.roomId}`;
+            return (
+              <div className="absolute top-4 right-4 z-10 bg-white border-[1.5px] border-[#E4E1D8] rounded-[20px] p-5 flex flex-col items-center gap-3 shadow-[0_4px_20px_rgba(43,42,51,0.10)]">
+                <p className="text-[13px] font-bold text-[#2B2A33]">
+                  Students scan to join
+                </p>
+                <div className="p-2 bg-white rounded-xl border border-[#E4E1D8]">
+                  <QRCodeSVG value={qrUrl} size={160} />
+                </div>
+                <button
+                  onClick={() => navigator.clipboard.writeText(qrUrl)}
+                  className="w-full min-h-9 rounded-[10px] bg-[#EEEEFB] text-[#4646C6] text-[13px] font-bold hover:bg-[#DCDCF7] transition-colors"
+                >
+                  Copy link
+                </button>
               </div>
-              <button
-                onClick={() => navigator.clipboard.writeText(joinUrl)}
-                className="w-full min-h-9 rounded-[10px] bg-[#EEEEFB] text-[#4646C6] text-[13px] font-bold hover:bg-[#DCDCF7] transition-colors"
-              >
-                Copy link
-              </button>
-            </div>
-          )}
+            );
+          })()}
           {room && watchedStudentId && teacherId ? (
             <CollabCanvas
               key={watchedStudentId}

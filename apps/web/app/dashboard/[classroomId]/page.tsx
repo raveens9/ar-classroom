@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { QRCodeSVG } from "qrcode.react";
@@ -44,6 +44,18 @@ export default function ClassroomPage() {
 
   const supabase = createClient();
 
+  const refreshSession = useCallback(async () => {
+    const { data: rows, error } = await supabase
+      .from("sessions")
+      .select("id, socket_room_id, created_at")
+      .eq("classroom_id", classroomId)
+      .is("ended_at", null)
+      .order("created_at", { ascending: false })
+      .limit(1);
+    if (error) console.error("[classroom] session fetch error:", error);
+    setActiveSession(rows?.[0] ?? null);
+  }, [classroomId]);
+
   useEffect(() => {
     async function load() {
       const { data: c } = await supabase
@@ -65,24 +77,19 @@ export default function ClassroomPage() {
       await refreshSession();
     }
 
-    async function refreshSession() {
-      const { data: sess } = await supabase
-        .from("sessions")
-        .select("id, socket_room_id, created_at")
-        .eq("classroom_id", classroomId)
-        .is("ended_at", null)
-        .maybeSingle();
-      setActiveSession(sess ?? null);
-    }
-
     load();
 
-    // Re-check the session whenever the user navigates back to this tab/page,
-    // so returning from the teacher view always shows the live session controls.
-    const onVisible = () => { if (document.visibilityState === "visible") refreshSession(); };
+    // Re-check when the user navigates back: window focus covers both
+    // Next.js soft-navigation returns and tab switches.
+    const onFocus = () => void refreshSession();
+    const onVisible = () => { if (document.visibilityState === "visible") void refreshSession(); };
+    window.addEventListener("focus", onFocus);
     document.addEventListener("visibilitychange", onVisible);
-    return () => document.removeEventListener("visibilitychange", onVisible);
-  }, [classroomId]);
+    return () => {
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [classroomId, refreshSession]);
 
   async function addStudent(e: React.FormEvent) {
     e.preventDefault();
@@ -100,6 +107,19 @@ export default function ClassroomPage() {
 
   async function startSession() {
     setStartingSession(true);
+    // Resume any existing active session rather than creating a duplicate.
+    const { data: existing } = await supabase
+      .from("sessions")
+      .select("id")
+      .eq("classroom_id", classroomId)
+      .is("ended_at", null)
+      .order("created_at", { ascending: false })
+      .limit(1);
+    if (existing?.[0]) {
+      router.push(`/teacher?sessionId=${existing[0].id}`);
+      setStartingSession(false);
+      return;
+    }
     const { data } = await supabase
       .from("sessions")
       .insert({ classroom_id: classroomId })
@@ -116,7 +136,7 @@ export default function ClassroomPage() {
     if (!confirm("End this session? Students will be disconnected and the session will close.")) return;
     setEndingSession(true);
     await supabase.from("sessions").update({ ended_at: new Date().toISOString() }).eq("id", activeSession.id);
-    setActiveSession(null);
+    await refreshSession();
     setEndingSession(false);
   }
 
@@ -165,7 +185,7 @@ export default function ClassroomPage() {
                   className="min-h-12 px-4 rounded-[14px] bg-[#2C9A4B] text-white text-[15px] font-semibold hover:bg-[#237B3C] transition-colors"
                   onClick={() => router.push(`/teacher?sessionId=${activeSession.id}`)}
                 >
-                  Open teacher view →
+                  {activeSession.socket_room_id ? "Go to live session →" : "Open teacher view →"}
                 </button>
                 <button
                   className="min-h-12 px-4 rounded-[14px] bg-[#FBE9EA] text-[#B22A35] text-[15px] font-semibold hover:bg-[#F6D5D8] disabled:opacity-60 transition-colors"
