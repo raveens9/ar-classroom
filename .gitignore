@@ -10,18 +10,12 @@ certs/
 apps/ml-api/.venv
 apps/ml-api/__pycache__
 apps/ml-api/**/__pycache__
+apps/style-transfer/src/style_transfer/__pycache__
 apps/ml-api/app/static/cutouts/
 apps/ml-api/app/static/textures/
 .DS_Store
 coverage
 .turbo
-
-# 3D model assets (large binaries, served from Supabase Storage — not committed to git)
-apps/web/public/Alphabet/
-apps/web/public/Animals/
-apps/web/public/Nature/
-apps/web/public/Vehicles/
-apps/web/public/Home/
 
 # TypeScript incremental build cache
 apps/web/tsconfig.tsbuildinfo

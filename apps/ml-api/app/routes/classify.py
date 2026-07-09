@@ -1,8 +1,12 @@
 """POST /v1/classify
 
 Runs the student's cutout through the correct QuickDraw CNN based on the room topic:
-  - topic="animals"  → image_classifier_fyp.keras    (butterfly, cat, dog, fish)
-  - topic="nature"   → image_classifier_nature.keras  (cloud, flower, rain, rainbow, sun, tree)
+  - topic="animals"    → image_classifier_fyp.keras         (butterfly, cat, dog, fish)
+  - topic="nature"     → image_classifier_nature.keras       (cloud, flower, rain, rainbow, sun, tree)
+  - topic="letters"    → image_classifier_alphabet.keras     (A–Z)
+  - topic="numbers"    → image_classifier_numbers.keras      (0–9)
+  - topic="vehicles"   → image_classifier_vehicles.keras     (car, airplane, sailboat, van)
+  - topic="vegetables" → image_classifier_vegetables.keras   (carrot, broccoli, corn, mushroom, pumpkin)
 """
 from __future__ import annotations
 
@@ -33,6 +37,26 @@ TOPIC_CONFIG: dict[str, dict] = {
         "path": _MODELS_DIR / "image_classifier_nature.keras",
         "classes": ["cloud", "flower", "rain", "rainbow", "sun", "tree"],
         "anim": {"cloud": "idle", "flower": "idle", "rain": "idle", "rainbow": "idle", "sun": "idle", "tree": "idle"},
+    },
+    "letters": {
+        "path": _MODELS_DIR / "image_classifier_alphabet.keras",
+        "classes": [chr(c) for c in range(ord("A"), ord("Z") + 1)],
+        "anim": {chr(c): "idle" for c in range(ord("A"), ord("Z") + 1)},
+    },
+    "numbers": {
+        "path": _MODELS_DIR / "image_classifier_numbers.keras",
+        "classes": [str(i) for i in range(10)],
+        "anim": {str(i): "idle" for i in range(10)},
+    },
+    "vehicles": {
+        "path": _MODELS_DIR / "image_classifier_vehicles.keras",
+        "classes": ["car", "airplane", "sailboat", "van"],
+        "anim": {"car": "drive", "airplane": "fly", "sailboat": "sail", "van": "drive"},
+    },
+    "vegetables": {
+        "path": _MODELS_DIR / "image_classifier_vegetables.keras",
+        "classes": ["carrot", "broccoli", "corn", "mushroom", "pumpkin"],
+        "anim": {k: "idle" for k in ["carrot", "broccoli", "corn", "mushroom", "pumpkin"]},
     },
 }
 

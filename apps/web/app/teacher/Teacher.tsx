@@ -28,6 +28,37 @@ const TOPIC_LABELS: Record<string, string[]> = {
     "bird",
   ],
   nature: ["cloud", "flower", "rain", "rainbow", "sun", "tree"],
+  letters: [
+    "A",
+    "B",
+    "C",
+    "D",
+    "E",
+    "F",
+    "G",
+    "H",
+    "I",
+    "J",
+    "K",
+    "L",
+    "M",
+    "N",
+    "O",
+    "P",
+    "Q",
+    "R",
+    "S",
+    "T",
+    "U",
+    "V",
+    "W",
+    "X",
+    "Y",
+    "Z",
+  ],
+  numbers: ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"],
+  vehicles: ["car", "airplane", "sailboat", "van"],
+  vegetables: ["carrot", "broccoli", "corn", "mushroom", "pumpkin"],
 };
 
 const COLOR_PRESETS = [
@@ -407,7 +438,6 @@ export default function TeacherPage() {
                   <option value="nature">Nature</option>
                   <option value="shapes">Shapes</option>
                   <option value="vegetables">Vegetables</option>
-                  <option value="vehicles">Vehicles</option>
                   <option value="numbers">Numbers</option>
                   <option value="letters">Letters</option>
                 </select>
