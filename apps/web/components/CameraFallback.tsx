@@ -19,8 +19,24 @@ interface Props {
 export function CameraFallback({ onReady }: Props) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const watchdogRef = useRef<number | null>(null);
+  const readyRef = useRef(false);
   const [isReady, setIsReady] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+
+  // iOS Safari often never fires the 'playing' event for camera MediaStreams
+  // even though the stream is live, so readiness is signalled from wherever we
+  // learn about it first (play() resolving, 'playing', or 'loadeddata').
+  const markReady = () => {
+    if (readyRef.current) return;
+    readyRef.current = true;
+    if (watchdogRef.current !== null) {
+      window.clearTimeout(watchdogRef.current);
+      watchdogRef.current = null;
+    }
+    setIsReady(true);
+    setErr(null);
+    onReady?.();
+  };
 
   useEffect(() => {
     let stream: MediaStream | null = null;
@@ -69,6 +85,9 @@ export function CameraFallback({ onReady }: Props) {
 
         if (cancelled) return;
         await v.play();
+        // play() resolving means frames are flowing — don't wait for the
+        // 'playing' event, which iOS may never fire for camera streams.
+        if (!cancelled) markReady();
       } catch (e) {
         if (!cancelled) {
           setErr(
@@ -92,14 +111,8 @@ export function CameraFallback({ onReady }: Props) {
         className="!absolute inset-0 w-full h-full object-cover"
         playsInline
         muted
-        onPlaying={() => {
-          if (watchdogRef.current !== null) {
-            window.clearTimeout(watchdogRef.current);
-            watchdogRef.current = null;
-          }
-          setIsReady(true);
-          onReady?.();
-        }}
+        onPlaying={markReady}
+        onLoadedData={markReady}
       />
 
       {/* Loading overlay — shown until the first frame arrives */}
