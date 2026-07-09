@@ -30,24 +30,57 @@ TEXTURES_DIR.mkdir(parents=True, exist_ok=True)
 
 # Paths are relative to the web app's /public root (apps/web/public/<path>).
 # Animated assets are preferred so users see motion in AR.
-MODEL_REGISTRY: dict[str, str] = {
-    "butterfly": "Animals/butterfly/animated_flying_fluttering_butterfly_loop.glb",
-    "cat":      "Animals/cat/cat.glb",
-    "dog":      "Animals/dog/dog.glb",
-    "dragon":   "Animals/dog/dog.glb",
-    "dinosaur": "Animals/dinosaur/dinosaur.glb",
-    "robot":    "Animals/cat/cat.glb",
-    "bird":     "Animals/butterfly/animated_flying_fluttering_butterfly_loop.glb",
-    "fish":     "Animals/fish/fish.glb",
-    # Nature labels
-    "cloud":    "Nature/cloud_animation.glb",
-    "flower":   "Nature/blue_flower_animated.glb",
-    "rain":     "Nature/rain_2.glb",
-    "rainbow":  "Nature/rainbow.glb",
-    "sun":      "Nature/cloud__sun_lowpoly.glb",
-    "tree":     "Nature/tree_animate.glb",
-    # Non-animal/nature labels → fall through to a letter (picked randomly at request time).
-    # Handled below in resolve_model_path().
+MODEL_REGISTRY: dict[str, str | list[str]] = {
+    # Animals
+    "butterfly": [
+        "Animals/butterfly/animated_flying_fluttering_butterfly_loop.glb",
+        "Animals/butterfly/butterfly.glb",
+        "Animals/butterfly/ulysses_butterfly.glb",
+    ],
+    "cat":       "Animals/cat/cat.glb",
+    "dog":       "Animals/dog/dog.glb",
+    "dragon":    "Animals/dog/dog.glb",
+    "dinosaur":  [
+        "Animals/dinosaur/dinosaur.glb",
+        "Animals/dinosaur/raptor_dinosaur_indoraptor.glb",
+    ],
+    "robot":     "Animals/cat/cat.glb",
+    "bird":      [
+        "Animals/butterfly/animated_flying_fluttering_butterfly_loop.glb",
+        "Animals/butterfly/butterfly.glb",
+        "Animals/butterfly/ulysses_butterfly.glb",
+    ],
+    "fish":      "Animals/fish/fish.glb",
+    # Nature
+    "cloud":     "Nature/cloud_animation.glb",
+    "flower":    [
+        "Nature/blue_flower_animated.glb",
+        "Nature/daisy_flower.glb",
+        "Nature/flower_animated.glb",
+        "Nature/flower_lowpoly.glb",
+    ],
+    "rain":      "Nature/rain_2.glb",
+    "rainbow":   "Nature/rainbow.glb",
+    "sun":       "Nature/cloud__sun_lowpoly.glb",
+    "tree":      [
+        "Nature/tree_animate.glb",
+        "Nature/tree_oak.glb",
+    ],
+    # Letters A–Z
+    **{chr(c): f"Alphabet/{chr(c)}.glb" for c in range(ord("A"), ord("Z") + 1)},
+    # Numbers 0–9
+    **{str(i): f"Numbers/{i}.glb" for i in range(10)},
+    # Vehicles
+    "car":       "Vehicles/car.glb",
+    "airplane":  "Vehicles/airplane.glb",
+    "sailboat":  "Vehicles/rowing_boat.glb",
+    "van":       "Vehicles/van.glb",
+    # Vegetables
+    "carrot":    "Vegetables/carrot.glb",
+    "broccoli":  "Vegetables/broccoli.glb",
+    "corn":      "Vegetables/corn.glb",
+    "mushroom":  "Vegetables/mushroom.glb",
+    "pumpkin":   "Vegetables/pumpkin.glb",
 }
 
 LETTERS: list[str] = [f"Alphabet/{c}.glb" for c in "ABCDEFGHIJKLMNOPQRSTUVWXYZ"]
@@ -55,10 +88,11 @@ LETTERS: list[str] = [f"Alphabet/{c}.glb" for c in "ABCDEFGHIJKLMNOPQRSTUVWXYZ"]
 
 def resolve_model_path(label: str) -> str:
     """Map a classifier label to a real file under apps/web/public."""
-    if label in MODEL_REGISTRY:
-        return MODEL_REGISTRY[label]
-    # Unknown labels (car, airplane, tree, house, rocket, …) — pick a random letter
-    # so the teacher still sees something on publish.
+    entry = MODEL_REGISTRY.get(label)
+    if isinstance(entry, list):
+        return random.choice(entry)
+    if entry:
+        return entry
     return random.choice(LETTERS)
 
 

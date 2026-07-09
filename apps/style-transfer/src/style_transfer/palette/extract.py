@@ -15,11 +15,45 @@ from skimage.color import lab2rgb, rgb2lab
 from sklearn.cluster import KMeans
 
 
+_MIN_BACKGROUND_KEEP_FRACTION = 0.01  # keep masking only if enough drawing remains
+_MIN_BACKGROUND_KEEP_PIXELS = 50
+
+
+def background_mask(
+    image: np.ndarray,
+    background_color: tuple[int, int, int],
+    threshold: float = 12.0,
+) -> np.ndarray:
+    """Boolean mask over flattened (H*W,) pixels: True where NOT background.
+
+    Distance to `background_color` is CIE76 Delta-E in Lab space, so it also
+    catches the anti-aliased near-background pixels along stroke edges —
+    an exact-equality match on the canvas colour would miss those.
+
+    Args:
+        image: RGB uint8 array (H, W, 3).
+        background_color: The known canvas background colour, e.g. (255, 255, 255).
+        threshold: Delta-E below which a pixel is treated as background.
+
+    Returns:
+        Bool array of shape (H*W,).
+    """
+    pixels_rgb = np.clip(image.reshape(-1, 3).astype(np.float64) / 255.0, 1e-5, 1.0)
+    bg_rgb = np.clip(np.array(background_color, dtype=np.float64) / 255.0, 1e-5, 1.0)
+    with np.errstate(divide="ignore", over="ignore", invalid="ignore"):
+        pixels_lab = rgb2lab(pixels_rgb.reshape(1, -1, 3)).reshape(-1, 3)
+        bg_lab = rgb2lab(bg_rgb.reshape(1, 1, 3)).reshape(3)
+    delta_e = np.sqrt(np.sum((pixels_lab - bg_lab) ** 2, axis=-1))
+    return delta_e > threshold
+
+
 def extract_palette(
     drawing_path: str,
     k: int = 6,
     n_init: int = 10,
     random_state: int = 42,
+    background_color: tuple[int, int, int] | None = None,
+    background_threshold: float = 12.0,
 ) -> np.ndarray:
     """Compute the k dominant colours of a drawing via k-means in Lab space.
 
@@ -28,13 +62,18 @@ def extract_palette(
         k: Number of palette colours to extract.
         n_init: Number of KMeans restarts (higher = more stable palette).
         random_state: Seed for reproducibility.
+        background_color: If given, canvas background colour to exclude from
+            the palette (e.g. the drawing app's fixed canvas colour).
+        background_threshold: Delta-E below which a pixel counts as background.
 
     Returns:
         Float32 array of shape (k, 3) in sRGB [0.0, 1.0].
     """
     img = Image.open(drawing_path).convert("RGB")
     return palette_from_image(np.array(img, dtype=np.uint8), k=k,
-                               n_init=n_init, random_state=random_state)
+                               n_init=n_init, random_state=random_state,
+                               background_color=background_color,
+                               background_threshold=background_threshold)
 
 
 def palette_from_image(
@@ -42,6 +81,8 @@ def palette_from_image(
     k: int = 6,
     n_init: int = 10,
     random_state: int = 42,
+    background_color: tuple[int, int, int] | None = None,
+    background_threshold: float = 12.0,
 ) -> np.ndarray:
     """Extract a palette from an RGB uint8 numpy array (H, W, 3).
 
@@ -50,6 +91,9 @@ def palette_from_image(
         k: Number of palette colours.
         n_init: KMeans restarts.
         random_state: Seed.
+        background_color: If given, canvas background colour to exclude from
+            the palette so it doesn't get picked up as one of the k colours.
+        background_threshold: Delta-E below which a pixel counts as background.
 
     Returns:
         Float32 array of shape (k, 3) in sRGB [0.0, 1.0].
@@ -69,6 +113,16 @@ def palette_from_image(
     # errstate: Apple Accelerate BLAS emits spurious divide-by-zero on the XYZ matmul.
     with np.errstate(divide="ignore", over="ignore", invalid="ignore"):
         pixels_lab = rgb2lab(pixels_rgb.reshape(1, -1, 3)).reshape(-1, 3)
+
+    if background_color is not None:
+        keep = background_mask(image, background_color, background_threshold)
+        min_keep = max(k, _MIN_BACKGROUND_KEEP_PIXELS,
+                       int(_MIN_BACKGROUND_KEEP_FRACTION * len(pixels_lab)))
+        if keep.sum() >= min_keep:
+            pixels_lab = pixels_lab[keep]
+        # else: masking would leave too little of the drawing to cluster
+        # reliably (e.g. a very sparse, thin-lined drawing) — fall back to
+        # using every pixel rather than starve k-means.
 
     # Subsample large images for speed (1M pixels is plenty for k-means)
     max_pixels = 1_000_000
